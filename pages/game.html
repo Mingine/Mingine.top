@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>游戏 - Mingine的小站</title>
+  <link rel="icon" type="image/jpeg" href="../assets/images/image00.png">
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="game-page">
+  <nav class="navbar glass">
+    <a href="../index.html" class="nav-brand">Mingine</a>
+    <div class="nav-links">
+      <a href="../index.html">首页</a>
+      <a href="game.html" style="font-weight: 700; color: var(--accent-color);">游戏</a>
+      <a href="contact.html">联系我</a>
+      <button class="theme-toggle" id="theme-btn" aria-label="切换主题">
+        <i class="fas fa-moon"></i>
+      </button>
+    </div>
+  </nav>
+
+  <main class="container game-hub" style="margin-top: 100px;">
+    <section class="glass game-hub-hero">
+      <div class="game-hub-hero-copy">
+        <span class="game-hub-kicker">Game Center</span>
+        <h1>游戏中心</h1>
+        <div class="game-hub-pills">
+          <span><i class="fas fa-mobile-alt"></i> 多设备游玩</span>
+          <span><i class="fas fa-globe"></i> 域名访问</span>
+          <span><i class="fas fa-bolt"></i> 即点即玩</span>
+        </div>
+      </div>
+
+      <div class="game-hub-highlight glass">
+        <div class="game-hub-highlight-label">当前收录</div>
+        <div class="game-hub-highlight-value">2</div>
+        <div class="game-hub-highlight-note">游戏</div>
+      </div>
+    </section>
+
+    <section class="game-hub-card glass">
+      <div class="game-hub-header">
+        <h2>选择入口</h2>
+        <p>点击下面的卡片进入对应游戏页面。</p>
+      </div>
+
+      <div class="game-choice-grid">
+        <a class="game-choice-card glass" href="game2048.html">
+          <div class="game-choice-icon"><i class="fas fa-border-all"></i></div>
+          <h2>2048</h2>
+          <p>键盘和滑动都支持，适合快速开一局。</p>
+          <span class="game-choice-action">进入 2048</span>
+        </a>
+
+        <a class="game-choice-card glass" href="../H5Game/index.html">
+          <div class="game-choice-icon"><i class="fas fa-gamepad"></i></div>
+          <h2>word solitaire</h2>
+          <p>一款卡牌小游戏demo。</p>
+          <span class="game-choice-action">进入 word solitaire</span>
+        </a>
+      </div>
+
+    </section>
+  </main>
+
+  <script src="../assets/js/main.js"></script>
+</body>
+</html>

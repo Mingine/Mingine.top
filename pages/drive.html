@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>我的云盘 - Mingine 的小站</title>
+  <link rel="icon" type="image/jpeg" href="../assets/images/image00.png">
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    /* ── 云盘页面专用样式 ── */
+    .drive-page {
+      min-height: 100vh;
+      background: var(--bg-color);
+    }
+
+    .drive-container {
+      max-width: 1100px;
+      margin: calc(var(--nav-height) + 30px) auto 40px auto;
+      padding: 0 20px;
+    }
+
+    /* 密码登录卡片 */
+    .drive-login-card {
+      max-width: 420px;
+      margin: 80px auto;
+      padding: 48px 36px;
+      text-align: center;
+    }
+
+    .drive-login-card h1 {
+      font-size: 1.8rem;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .drive-login-card .subtitle {
+      color: var(--text-color);
+      opacity: 0.65;
+      margin-bottom: 28px;
+      font-size: 0.92rem;
+    }
+
+    .drive-login-card .input-group {
+      display: flex;
+      gap: 10px;
+    }
+
+    .drive-login-card input {
+      flex: 1;
+      padding: 12px 16px;
+      border: 1px solid var(--glass-border);
+      border-radius: 10px;
+      background: transparent;
+      color: var(--text-color);
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .drive-login-card input:focus {
+      border-color: var(--accent-color);
+    }
+
+    .drive-login-card .login-error {
+      color: #ef4444;
+      font-size: 0.88rem;
+      margin-top: 12px;
+      min-height: 22px;
+    }
+
+    .btn-primary {
+      padding: 12px 24px;
+      background: var(--accent-color);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: filter 0.2s, transform 0.15s;
+      white-space: nowrap;
+    }
+
+    .btn-primary:hover {
+      filter: brightness(1.08);
+    }
+
+    .btn-primary:active {
+      transform: scale(0.97);
+    }
+
+    .btn-outline {
+      padding: 8px 16px;
+      background: transparent;
+      color: var(--text-color);
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+
+    .btn-outline:hover {
+      border-color: var(--accent-color);
+      color: var(--accent-color);
+    }
+
+    .btn-danger {
+      padding: 6px 14px;
+      background: transparent;
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      border-radius: 8px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-danger:hover {
+      background: #ef4444;
+      color: #fff;
+      border-color: #ef4444;
+    }
+
+    /* 主面板 */
+    .drive-panel {
+      display: none;
+    }
+
+    .drive-panel.active {
+      display: block;
+    }
+
+    .drive-login-card.hidden {
+      display: none;
+    }
+
+    .drive-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .drive-header h1 {
+      font-size: 1.8rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .drive-header-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    /* 上传区域 */
+    .upload-zone {
+      border: 2px dashed var(--glass-border);
+      border-radius: 14px;
+      padding: 32px;
+      text-align: center;
+      transition: border-color 0.25s, background 0.25s;
+      cursor: pointer;
+      margin-bottom: 24px;
+      background: var(--glass-bg);
+    }
+
+    .upload-zone:hover,
+    .upload-zone.drag-over {
+      border-color: var(--accent-color);
+      background: rgba(59, 130, 246, 0.06);
+    }
+
+    .upload-zone i {
+      font-size: 2.5rem;
+      color: var(--accent-color);
+      margin-bottom: 10px;
+    }
+
+    .upload-zone p {
+      margin: 4px 0;
+      opacity: 0.8;
+    }
+
+    .upload-zone .hint {
+      font-size: 0.85rem;
+      opacity: 0.55;
+    }
+
+    .upload-progress {
+      display: none;
+      margin-top: 12px;
+    }
+
+    .upload-progress.active {
+      display: block;
+    }
+
+    .progress-bar-track {
+      height: 6px;
+      background: var(--glass-border);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 8px;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--accent-color);
+      border-radius: 3px;
+      transition: width 0.3s;
+    }
+
+    /* 文件列表 */
+    .file-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .file-count {
+      opacity: 0.7;
+      font-size: 0.9rem;
+    }
+
+    .file-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 14px;
+    }
+
+    .file-card {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 16px 18px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .file-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(15, 23, 42, 0.12);
+    }
+
+    .file-icon {
+      width: 48px;
+      height: 48px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.6rem;
+      border-radius: 12px;
+      background: rgba(59, 130, 246, 0.1);
+      color: var(--accent-color);
+    }
+
+    .file-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .file-name {
+      font-weight: 600;
+      font-size: 0.95rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 4px;
+    }
+
+    .file-meta {
+      font-size: 0.8rem;
+      opacity: 0.6;
+      display: flex;
+      gap: 12px;
+    }
+
+    .file-actions {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .btn-icon {
+      width: 36px;
+      height: 36px;
+      border: 1px solid var(--glass-border);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--text-color);
+      cursor: pointer;
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .btn-icon:hover {
+      border-color: var(--accent-color);
+      color: var(--accent-color);
+      background: rgba(59, 130, 246, 0.06);
+    }
+
+    .btn-icon.danger:hover {
+      border-color: #ef4444;
+      color: #ef4444;
+      background: rgba(239, 68, 68, 0.06);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      grid-column: 1 / -1;
+    }
+
+    .empty-state i {
+      font-size: 3.5rem;
+      color: var(--glass-border);
+      margin-bottom: 16px;
+    }
+
+    .empty-state p {
+      opacity: 0.5;
+      font-size: 0.95rem;
+    }
+
+    /* Toast 消息 */
+    .toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 12px 24px;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 0.92rem;
+      font-weight: 500;
+      z-index: 9999;
+      animation: toastIn 0.3s ease;
+      backdrop-filter: blur(8px);
+    }
+
+    .toast.success {
+      background: rgba(16, 185, 129, 0.9);
+    }
+
+    .toast.error {
+      background: rgba(239, 68, 68, 0.9);
+    }
+
+    .toast.fadeout {
+      animation: toastOut 0.35s ease forwards;
+    }
+
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+      to { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+
+    @keyframes toastOut {
+      from { opacity: 1; transform: translateX(-50%) translateY(0); }
+      to { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+    }
+  </style>
+</head>
+<body class="drive-page">
+  <!-- 导航栏 -->
+  <nav class="navbar glass">
+    <a href="../index.html" class="nav-brand">Mingine</a>
+    <div class="nav-links">
+      <a href="../index.html">首页</a>
+      <a href="game.html">游戏</a>
+      <a href="contact.html">联系我</a>
+      <button class="theme-toggle" id="theme-btn" aria-label="切换主题">
+        <i class="fas fa-moon"></i>
+      </button>
+    </div>
+  </nav>
+
+  <div class="drive-container">
+    <!-- 登录卡片 -->
+    <div class="drive-login-card glass" id="login-card">
+      <h1><i class="fas fa-cloud"></i> 我的云盘</h1>
+      <p class="subtitle">请输入管理密码以访问私有云盘</p>
+      <div class="input-group">
+        <input type="password" id="login-password" placeholder="输入密码…" />
+        <button class="btn-primary" id="login-btn">
+          <i class="fas fa-arrow-right-to-bracket"></i> 登录
+        </button>
+      </div>
+      <div class="login-error" id="login-error"></div>
+    </div>
+
+    <!-- 主面板 -->
+    <div class="drive-panel" id="drive-panel">
+      <div class="drive-header">
+        <h1><i class="fas fa-cloud"></i> 我的云盘</h1>
+        <div class="drive-header-actions">
+          <span id="storage-usage" style="opacity:0.65; font-size:0.88rem;"></span>
+          <button class="btn-outline" id="logout-btn">
+            <i class="fas fa-sign-out-alt"></i> 退出
+          </button>
+        </div>
+      </div>
+
+      <!-- 上传区域 -->
+      <div class="upload-zone glass" id="upload-zone">
+        <i class="fas fa-cloud-upload-alt"></i>
+        <p><strong>点击此处上传文件</strong>，或将文件拖放到此区域</p>
+        <p class="hint">支持任意文件类型，单个文件最大 500MB</p>
+        <input type="file" id="file-input" multiple style="display:none;" />
+        <div class="upload-progress" id="upload-progress">
+          <span id="upload-status">上传中…</span>
+          <div class="progress-bar-track">
+            <div class="progress-bar-fill" id="progress-fill"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 文件工具栏 -->
+      <div class="file-toolbar">
+        <span class="file-count" id="file-count"></span>
+        <button class="btn-outline" id="refresh-btn">
+          <i class="fas fa-sync-alt"></i> 刷新
+        </button>
+      </div>
+
+      <!-- 文件列表 -->
+      <div class="file-grid" id="file-grid"></div>
+    </div>
+  </div>
+
+  <script src="../assets/js/main.js"></script>
+  <script src="../assets/js/drive.js"></script>
+</body>
+</html>

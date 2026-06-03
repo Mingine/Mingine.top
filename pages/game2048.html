@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2048 - Mingine的小站</title>
+  <link rel="icon" type="image/jpeg" href="../assets/images/image00.png">
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    .game-message {
+      display: none;
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(238, 228, 218, 0.73);
+      z-index: 100;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar glass">
+    <a href="../index.html" class="nav-brand">Mingine</a>
+    <div class="nav-links">
+      <a href="../index.html">首页</a>
+      <a href="game.html">游戏</a>
+      <a href="contact.html">联系我</a>
+      <button class="theme-toggle" id="theme-btn" aria-label="切换主题">
+        <i class="fas fa-moon"></i>
+      </button>
+    </div>
+  </nav>
+
+  <div class="container" style="margin-top: 100px;">
+    <div class="game-container glass">
+      <div class="game-header">
+        <div class="score-box">
+          <div style="font-size: 0.8rem;text-transform: uppercase;">当前分数</div>
+          <div id="score" style="font-weight: bold;font-size: 1.5rem;">0</div>
+        </div>
+        <button id="restart-btn" class="tag" style="border:none;cursor:pointer;font-size: 1rem;"><i class="fas fa-redo"></i> 重新开始</button>
+      </div>
+      
+      <div class="grid-container" id="grid">
+        <div class="grid-cell" id="grid-cell-0-0"></div>
+        <div class="grid-cell" id="grid-cell-0-1"></div>
+        <div class="grid-cell" id="grid-cell-0-2"></div>
+        <div class="grid-cell" id="grid-cell-0-3"></div>
+        
+        <div class="grid-cell" id="grid-cell-1-0"></div>
+        <div class="grid-cell" id="grid-cell-1-1"></div>
+        <div class="grid-cell" id="grid-cell-1-2"></div>
+        <div class="grid-cell" id="grid-cell-1-3"></div>
+        
+        <div class="grid-cell" id="grid-cell-2-0"></div>
+        <div class="grid-cell" id="grid-cell-2-1"></div>
+        <div class="grid-cell" id="grid-cell-2-2"></div>
+        <div class="grid-cell" id="grid-cell-2-3"></div>
+        
+        <div class="grid-cell" id="grid-cell-3-0"></div>
+        <div class="grid-cell" id="grid-cell-3-1"></div>
+        <div class="grid-cell" id="grid-cell-3-2"></div>
+        <div class="grid-cell" id="grid-cell-3-3"></div>
+      </div>
+      
+      <div style="margin-top: 25px; padding: 15px; border-radius: 8px; background: var(--glass-border); line-height: 1.6; font-size: 0.95rem; color: var(--text-color);">
+        <h3 style="font-size: 1.1rem; margin-bottom: 8px;"><i class="fas fa-info-circle"></i> 怎么玩：</h3>
+        <p style="margin-bottom: 5px;">💻 <strong>电脑端</strong>：使用键盘 <b>↑ ↓ ← →</b> 方向键来移动方块。</p>
+        <p style="margin-bottom: 10px;">📱 <strong>移动端</strong>：在游戏区域内<b>滑动屏幕</b>。</p>
+        <p style="opacity: 0.9;">每次滑动后，所有的方块都会向该方向滑动。当两个数字相同的方块相遇时，它们会合并成一个。尽情合并，努力达到 <b>2048</b> 吧！</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="../assets/js/main.js"></script>
+  <script src="../assets/js/game2048.js"></script>
+</body>
+</html>

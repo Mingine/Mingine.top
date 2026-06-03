@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>联系我 - Mingine的小站</title>
+  <link rel="icon" type="image/jpeg" href="../assets/images/image00.png">
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+  <nav class="navbar glass">
+    <a href="../index.html" class="nav-brand">Mingine</a>
+    <div class="nav-links">
+      <a href="../index.html">首页</a>
+      <a href="game.html">游戏</a>
+      <a href="contact.html" style="font-weight: 700; color: var(--accent-color);">联系我</a>
+      <button class="theme-toggle" id="theme-btn" aria-label="切换主题">
+        <i class="fas fa-moon"></i>
+      </button>
+    </div>
+  </nav>
+
+  <div class="container" style="margin-top: 100px;">
+    <div class="profile-card glass">
+      <h1>联系与关注 🚀</h1>
+      <p style="margin-top:20px; line-height: 1.8;">
+        可以通过以下方式联系我
+      </p>
+      
+      <div class="contact-links">
+        <a href="https://github.com/Mingine" target="_blank" rel="noopener noreferrer" title="GitHub" aria-label="GitHub 主页">
+          <i class="fab fa-github"></i>
+          <span>GitHub</span>
+        </a>
+        <a href="mailto:mingl_z@163.com" title="Email" aria-label="发送邮件到 mingl_z@163.com">
+          <i class="fas fa-envelope"></i>
+          <span>Email</span>
+        </a>
+        <a href="https://steamcommunity.com/id/Mingine/" target="_blank" rel="noopener noreferrer" title="Steam" aria-label="Steam 个人资料">
+          <i class="fab fa-steam"></i>
+          <span>Steam</span>
+        </a>
+        <a href="javascript:void(0)" onclick="alert('微信号: M1ngine')" title="WeChat" aria-label="微信号 M1ngine">
+          <i class="fab fa-weixin"></i>
+          <span>WeChat</span>
+        </a>
+      </div>
+      
+      <div id="comment-section" style="margin-top:40px; text-align: left;">
+        <div class="bili-comment-header">
+          <h3 class="bili-comment-title">
+            <i class="fas fa-comment-dots"></i> 评论区
+            <span class="bili-comment-count" id="comment-total">加载中...</span>
+          </h3>
+          <div class="bili-sort-tabs" id="sort-tabs">
+            <button class="bili-sort-btn active" data-sort="newest">最新</button>
+            <button class="bili-sort-btn" data-sort="hottest">最热</button>
+          </div>
+        </div>
+
+        <!-- 发布评论 -->
+        <div class="bili-post-box">
+          <div class="bili-avatar bili-avatar-lg" id="post-avatar">M</div>
+          <div class="bili-post-body">
+            <textarea id="bili-post-text" class="bili-post-textarea" placeholder="发一条友善的评论..." rows="3" maxlength="500"></textarea>
+            <div class="bili-post-footer">
+              <div class="bili-post-inputs">
+                <input id="bili-post-name" type="text" class="bili-input" placeholder="你的昵称 *" maxlength="40" />
+                <input id="bili-post-email" type="email" class="bili-input" placeholder="邮箱 (选填)" maxlength="100" />
+              </div>
+              <div class="bili-post-actions">
+                <span class="bili-char-count"><span id="bili-char-count">0</span>/500</span>
+                <button id="bili-post-submit" class="bili-btn-primary">发表评论</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 评论列表 -->
+        <div id="bili-comment-list" class="bili-comment-list">
+          <div class="bili-loading">加载中...</div>
+        </div>
+
+        <!-- 分页 -->
+        <div class="bili-pagination" id="bili-pagination"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../assets/js/main.js"></script>
+  <script src="../assets/js/contact.js"></script>
+
+  <!-- B站评论区风格 CSS (内联) -->
+  <style>
+    :root {
+      --bili-pink: #FB7299;
+      --bili-blue: #00AEEC;
+      --bili-text: #18191C;
+      --bili-text-light: #9499A0;
+      --bili-border: #E3E5E7;
+      --bili-bg: #F6F7F8;
+      --bili-avatar-colors: #FB7299, #00AEEC, #F25D8E, #6DC781, #FFB347, #8B5CF6, #06B6D4, #F97316;
+    }
+
+    [data-theme="dark"] {
+      --bili-text: #E8E8EA;
+      --bili-text-light: #9499A0;
+      --bili-border: #3A3A3D;
+      --bili-bg: #1F1F23;
+    }
+
+    /* ── 评论区容器 ── */
+    .bili-comment-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--bili-border);
+    }
+    .bili-comment-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--bili-text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .bili-comment-count {
+      font-size: 0.85rem;
+      font-weight: 400;
+      color: var(--bili-text-light);
+    }
+    .bili-sort-tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--bili-bg);
+      border-radius: 8px;
+      padding: 3px;
+    }
+    .bili-sort-btn {
+      padding: 6px 14px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--bili-text-light);
+      cursor: pointer;
+      font-size: 0.88rem;
+      transition: all 0.2s;
+    }
+    .bili-sort-btn.active {
+      background: #fff;
+      color: var(--bili-pink);
+      font-weight: 600;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    [data-theme="dark"] .bili-sort-btn.active {
+      background: #2A2A2E;
+      box-shadow: none;
+    }
+
+    /* ── 发布框 ── */
+    .bili-post-box {
+      display: flex;
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+    .bili-post-body {
+      flex: 1;
+      min-width: 0;
+    }
+    .bili-post-textarea {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid var(--bili-border);
+      border-radius: 10px;
+      background: var(--bili-bg);
+      color: var(--bili-text);
+      font-size: 0.93rem;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.2s, background 0.2s;
+      font-family: inherit;
+    }
+    .bili-post-textarea:focus {
+      border-color: var(--bili-pink);
+      background: transparent;
+    }
+    .bili-post-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .bili-post-inputs {
+      display: flex;
+      gap: 8px;
+      flex: 1;
+    }
+    .bili-input {
+      flex: 1;
+      padding: 7px 12px;
+      border: 1px solid var(--bili-border);
+      border-radius: 8px;
+      background: var(--bili-bg);
+      color: var(--bili-text);
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .bili-input:focus {
+      border-color: var(--bili-pink);
+    }
+    .bili-post-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .bili-char-count {
+      font-size: 0.8rem;
+      color: var(--bili-text-light);
+    }
+    .bili-btn-primary {
+      padding: 8px 20px;
+      border: none;
+      border-radius: 8px;
+      background: var(--bili-pink);
+      color: #fff;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s;
+    }
+    .bili-btn-primary:hover {
+      opacity: 0.88;
+    }
+    .bili-btn-primary:active {
+      transform: scale(0.97);
+    }
+    .bili-btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* ── 头像 ── */
+    .bili-avatar {
+      flex-shrink: 0;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1rem;
+      color: #fff;
+      user-select: none;
+    }
+    .bili-avatar-lg {
+      width: 48px;
+      height: 48px;
+      font-size: 1.2rem;
+    }
+    .bili-avatar-sm {
+      width: 32px;
+      height: 32px;
+      font-size: 0.85rem;
+    }
+
+    /* ── 评论列表 ── */
+    .bili-comment-list {
+      display: flex;
+      flex-direction: column;
+    }
+    .bili-loading {
+      text-align: center;
+      padding: 40px;
+      color: var(--bili-text-light);
+    }
+
+    .bili-comment-item {
+      padding: 18px 0;
+      border-bottom: 1px solid var(--bili-border);
+    }
+    .bili-comment-item:last-child {
+      border-bottom: none;
+    }
+    .bili-comment-main {
+      display: flex;
+      gap: 12px;
+    }
+    .bili-comment-content {
+      flex: 1;
+      min-width: 0;
+    }
+    .bili-comment-top {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+      flex-wrap: wrap;
+    }
+    .bili-comment-name {
+      font-weight: 600;
+      font-size: 0.92rem;
+      color: var(--bili-blue);
+    }
+    .bili-comment-time {
+      font-size: 0.8rem;
+      color: var(--bili-text-light);
+    }
+    .bili-comment-text {
+      font-size: 0.93rem;
+      line-height: 1.65;
+      color: var(--bili-text);
+      margin-bottom: 8px;
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+    .bili-comment-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .bili-action-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      border: none;
+      background: transparent;
+      color: var(--bili-text-light);
+      font-size: 0.85rem;
+      cursor: pointer;
+      padding: 4px 6px;
+      border-radius: 4px;
+      transition: color 0.2s;
+    }
+    .bili-action-btn:hover {
+      color: var(--bili-pink);
+    }
+    .bili-action-btn.liked {
+      color: var(--bili-blue);
+    }
+    .bili-action-btn .count {
+      font-size: 0.82rem;
+    }
+
+    /* ── 楼中楼回复区 ── */
+    .bili-replies-wrap {
+      margin-top: 8px;
+      margin-left: 52px;
+      padding: 10px 14px;
+      background: var(--bili-bg);
+      border-radius: 8px;
+      border-left: 3px solid var(--bili-pink);
+    }
+    .bili-reply-item {
+      padding: 6px 0;
+      display: flex;
+      gap: 8px;
+    }
+    .bili-reply-item + .bili-reply-item {
+      border-top: 1px solid var(--bili-border);
+      margin-top: 6px;
+      padding-top: 10px;
+    }
+    .bili-reply-content {
+      flex: 1;
+      min-width: 0;
+    }
+    .bili-reply-top {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 2px;
+    }
+    .bili-reply-name {
+      font-weight: 600;
+      font-size: 0.84rem;
+      color: var(--bili-blue);
+    }
+    .bili-reply-text {
+      font-size: 0.88rem;
+      line-height: 1.5;
+      color: var(--bili-text);
+      word-break: break-word;
+      white-space: pre-wrap;
+      margin-bottom: 4px;
+    }
+    .bili-reply-time {
+      font-size: 0.76rem;
+      color: var(--bili-text-light);
+    }
+    .bili-reply-like {
+      font-size: 0.78rem;
+      color: var(--bili-text-light);
+      cursor: pointer;
+      border: none;
+      background: transparent;
+      padding: 2px 4px;
+      transition: color 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .bili-reply-like:hover,
+    .bili-reply-like.liked {
+      color: var(--bili-blue);
+    }
+    .bili-more-replies {
+      font-size: 0.82rem;
+      color: var(--bili-blue);
+      cursor: pointer;
+      padding: 4px 0 2px;
+      background: none;
+      border: none;
+    }
+    .bili-more-replies:hover {
+      text-decoration: underline;
+    }
+
+    /* ── 行内回复框 ── */
+    .bili-inline-reply {
+      margin-top: 8px;
+      display: flex;
+      gap: 8px;
+    }
+    .bili-inline-reply.hidden {
+      display: none;
+    }
+    .bili-inline-reply textarea {
+      flex: 1;
+      padding: 8px 10px;
+      border: 1px solid var(--bili-border);
+      border-radius: 8px;
+      background: var(--bili-bg);
+      color: var(--bili-text);
+      font-size: 0.85rem;
+      resize: vertical;
+      outline: none;
+      font-family: inherit;
+    }
+    .bili-inline-reply textarea:focus {
+      border-color: var(--bili-pink);
+    }
+    .bili-inline-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
+      align-items: center;
+    }
+    .bili-inline-actions input {
+      flex: 1;
+      padding: 6px 10px;
+      border: 1px solid var(--bili-border);
+      border-radius: 6px;
+      background: var(--bili-bg);
+      color: var(--bili-text);
+      font-size: 0.82rem;
+      outline: none;
+    }
+    .bili-btn-sm {
+      padding: 6px 14px;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .bili-btn-sm.primary {
+      background: var(--bili-pink);
+      color: #fff;
+    }
+    .bili-btn-sm.cancel {
+      background: transparent;
+      color: var(--bili-text-light);
+      border: 1px solid var(--bili-border);
+    }
+
+    /* ── 分页 ── */
+    .bili-pagination {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+      margin-top: 28px;
+      flex-wrap: wrap;
+    }
+    .bili-page-btn {
+      min-width: 36px;
+      height: 36px;
+      padding: 0 10px;
+      border: 1px solid var(--bili-border);
+      border-radius: 8px;
+      background: transparent;
+      color: var(--bili-text);
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .bili-page-btn:hover {
+      border-color: var(--bili-pink);
+      color: var(--bili-pink);
+    }
+    .bili-page-btn.active {
+      background: var(--bili-pink);
+      color: #fff;
+      border-color: var(--bili-pink);
+    }
+    .bili-page-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    /* ── 状态提示 ── */
+    .bili-status {
+      text-align: center;
+      padding: 12px;
+      font-size: 0.88rem;
+      color: var(--bili-text-light);
+    }
+    .bili-status.error {
+      color: #ef4444;
+    }
+    .bili-toast {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 10px 22px;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 0.9rem;
+      z-index: 9999;
+      animation: toastIn 0.3s ease;
+    }
+    .bili-toast.success { background: rgba(16,185,129,0.92); }
+    .bili-toast.error { background: rgba(239,68,68,0.92); }
+    .bili-toast.fadeout { animation: toastOut 0.35s ease forwards; }
+    @keyframes toastIn { from{opacity:0;transform:translateX(-50%) translateY(-10px);} to{opacity:1;transform:translateX(-50%) translateY(0);} }
+    @keyframes toastOut { from{opacity:1;transform:translateX(-50%) translateY(0);} to{opacity:0;transform:translateX(-50%) translateY(-10px);} }
+  </style>
+</body>
+</html>
