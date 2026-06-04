@@ -52,6 +52,9 @@ async function checkAuth() {
             loadFiles();
         } else {
             showLogin();
+            if (data.expired) {
+                showToast('登录已过期，请重新输入密码', 'error');
+            }
         }
     } catch (e) {
         showLogin();

@@ -32,6 +32,12 @@ function requireAuth(): void
     if (empty($_SESSION['drive_authed'])) {
         respond(401, ['error' => '未授权，请先输入密码']);
     }
+    // 24 小时过期
+    $loginTime = $_SESSION['drive_authed_time'] ?? 0;
+    if (time() - $loginTime > 86400) {
+        unset($_SESSION['drive_authed'], $_SESSION['drive_authed_time']);
+        respond(401, ['error' => '登录已过期，请重新输入密码']);
+    }
 }
 
 function storagePath(): string
@@ -167,19 +173,31 @@ switch ($action) {
             respond(403, ['error' => '密码错误']);
         }
         $_SESSION['drive_authed'] = true;
+        $_SESSION['drive_authed_time'] = time();
         respond(200, ['ok' => true, 'message' => '登录成功']);
         break;
 
     // ── 登出 ──
     case 'logout':
-        unset($_SESSION['drive_authed']);
+        unset($_SESSION['drive_authed'], $_SESSION['drive_authed_time']);
         respond(200, ['ok' => true, 'message' => '已退出']);
         break;
 
     // ── 检查登录状态 ──
     case 'check':
+        $authed = !empty($_SESSION['drive_authed']);
+        $expired = false;
+        if ($authed) {
+            $loginTime = $_SESSION['drive_authed_time'] ?? 0;
+            if (time() - $loginTime > 86400) {
+                unset($_SESSION['drive_authed'], $_SESSION['drive_authed_time']);
+                $authed = false;
+                $expired = true;
+            }
+        }
         respond(200, [
-            'authed' => !empty($_SESSION['drive_authed']),
+            'authed' => $authed,
+            'expired' => $expired,
         ]);
         break;
 
