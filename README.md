@@ -1,98 +1,203 @@
-# Mingine.top Project Structure
+<p align="center">
+  <img src="assets/images/image00.jpg" width="120" height="120" style="border-radius: 50%;" alt="Mingine Logo" />
+</p>
 
-This workspace has been reorganized to follow a common static-website development layout.
+<h1 align="center">Mingine.top</h1>
 
-## Directory Layout
+<p align="center">
+  <strong>🏠 我的个人小站 — 集博客、游戏、音乐、AI 聊天、云盘于一体</strong>
+</p>
 
-```text
+<p align="center">
+  <a href="https://mingine.top"><img src="https://img.shields.io/badge/🌐-mingine.top-FB7299?style=flat-square" alt="Website" /></a>
+  <img src="https://img.shields.io/badge/PHP-8.0+-777BB4?style=flat-square&logo=php&logoColor=white" alt="PHP" />
+  <img src="https://img.shields.io/badge/MySQL-8.0-4479A1?style=flat-square&logo=mysql&logoColor=white" alt="MySQL" />
+  <img src="https://img.shields.io/badge/JavaScript-ES6-F7DF1E?style=flat-square&logo=javascript&logoColor=black" alt="JS" />
+  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License" />
+</p>
+
+---
+
+## ✨ 特性亮点
+
+| 模块 | 说明 |
+|:--|:--|
+| 🤖 **AI 聊天机器人** | 悬浮窗 DeepSeek AI 助手，与访客实时对话 |
+| 🎮 **游戏中心** | 内置 2048 等小游戏，以及 Unity WebGL 游戏 |
+| 🎵 **音乐播放器** | 网易云 + Spotify 双源切换，悬浮播放 |
+| 💬 **B站风格评论区** | 仿 Bilibili 评论区：一级评论 + 楼中楼回复 + 点赞 + 分页 |
+| ☁️ **私有云盘** | 密码保护的文件上传/下载/管理，仅自己可访问 |
+| 🌓 **明暗主题** | Glassmorphism 毛玻璃风格，自动跟随系统偏好 |
+| 📱 **响应式设计** | 适配 PC、平板、手机 |
+
+---
+
+## 🛠 技术栈
+
+| 层级 | 技术 |
+|:--|:--|
+| **前端** | HTML5 · CSS3 (Glassmorphism) · Vanilla JavaScript |
+| **后端** | PHP 8 · PDO |
+| **数据库** | MySQL 8 · utf8mb4 |
+| **AI** | DeepSeek API |
+| **部署** | 阿里云 ECS · 宝塔面板 · Nginx |
+| **CDN** | Cloudflare |
+| **图标** | Font Awesome 6 |
+
+---
+
+## 📁 项目结构
+
+```
 Mingine.top/
-  index.html                # Home page entry
-  pages/
-    game.html               # 2048 game page
-    contact.html            # Contact page
-  assets/
-    css/
-      style.css             # Global stylesheet
-    js/
-      main.js               # Shared UI logic (theme toggle)
-      ai-chat.js            # Chat widget behavior
-      game2048.js           # 2048 game logic
-    images/
-      image00.jpg           # Site image assets
-  server/
-    api/
-      chat.php              # Backend chat API endpoint
-      guestbook.php          # Database-backed guestbook API endpoint
-      drive.php              # Cloud drive API (upload/download/manage)
-    storage/                  # Cloud drive file storage (web-inaccessible)
-    sql/
-      guestbook.sql          # MySQL schema for the guestbook table
-  README.md
+├── index.html                     # 首页
+├── pages/
+│   ├── contact.html               # 联系页 + B站风格评论区
+│   ├── drive.html                 # 私有云盘
+│   ├── game.html                  # 游戏中心
+│   ├── game2048.html              # 2048 游戏
+│   └── portfolio.html             # 作品集
+├── assets/
+│   ├── css/
+│   │   └── style.css              # 全局样式 (Glassmorphism + 明暗主题)
+│   ├── js/
+│   │   ├── main.js                # 共享逻辑 (主题切换)
+│   │   ├── ai-chat.js             # AI 聊天
+│   │   ├── contact.js             # 评论区交互
+│   │   ├── drive.js               # 云盘交互
+│   │   ├── game2048.js            # 2048 游戏逻辑
+│   │   └── music-player.js        # 音乐播放器
+│   ├── images/                    # 图片资源
+│   └── videos/                    # 视频资源
+├── H5Game/                        # Unity WebGL 游戏
+├── server/
+│   ├── api/
+│   │   ├── chat.php               # AI 聊天 API (DeepSeek)
+│   │   ├── guestbook.php          # 评论区 API (CRUD + 点赞)
+│   │   ├── guestbook.config.php   # 数据库配置
+│   │   └── drive.php              # 云盘 API (上传/下载/管理)
+│   ├── storage/                   # 云盘文件存储 (Web 不可访问)
+│   ├── sql/
+│   │   └── guestbook.sql          # 数据库建表脚本
+│   ├── config/                    # 配置文件
+│   └── data/
+│       └── guestbook.json         # 数据文件
+└── README.md
 ```
 
-## Suggested Development Workflow
+---
 
-1. Add or update page templates in `index.html` and `pages/`.
-2. Put shared styles in `assets/css/`.
-3. Put client scripts in `assets/js/`.
-4. Put image/media files in `assets/images/`.
-5. Keep backend interfaces in `server/api/`.
-6. Test links and resource paths after adding new pages.
+## 🚀 快速部署
 
-## Guestbook Database Setup
+### 环境要求
 
-The contact page guestbook uses a MySQL database through PDO.
+- PHP 8.0+
+- MySQL 8.0+
+- Nginx / Apache
+- 宝塔面板 (推荐)
 
-Set these environment variables on your server:
+### 部署步骤
 
-- `GUESTBOOK_DB_DSN` or `DB_DSN`
-- `GUESTBOOK_DB_USER` or `DB_USER`
-- `GUESTBOOK_DB_PASSWORD` or `DB_PASSWORD`
-- `GUESTBOOK_DB_TABLE` or `DB_TABLE` (optional, defaults to `guestbook_entries`)
+1. **克隆仓库到服务器**
 
-Use `server/sql/guestbook.sql` to create the table before first use.
+```bash
+cd /www/wwwroot
+git clone https://github.com/Mingine/Mingine.top.git
+```
 
-## Cloud Drive (云盘) Setup
+2. **配置数据库**
 
-The cloud drive is a password-protected private file storage area. Only the site owner can upload, download, and manage files.
+在宝塔面板中创建 MySQL 数据库，编辑 `server/api/guestbook.config.php`：
 
-### Server Configuration
+```php
+return [
+    'dsn'      => 'mysql:host=127.0.0.1;port=3306;dbname=你的数据库名;charset=utf8mb4',
+    'user'     => '你的数据库用户名',
+    'password' => '你的数据库密码',
+    'table'    => 'guestbook_entries',
+];
+```
 
-Set this environment variable on your server (宝塔面板 → 网站 → 配置文件 → PHP 环境变量):
+3. **配置环境变量**
 
-- `DRIVE_PASSWORD` — Your private access password
+在宝塔面板 → 网站 → 配置文件 → PHP 环境变量中设置：
 
-### How to set DRIVE_PASSWORD in 宝塔面板 (Baota)
+```ini
+env[DEEPSEEK_API_KEY] = "你的 DeepSeek API Key"
+env[DRIVE_PASSWORD]   = "你的云盘密码"
+```
 
-1. Open 宝塔面板 → **网站** → click your site → **配置文件**
-2. Find the PHP configuration section
-3. Add: `env[DRIVE_PASSWORD] = "your-strong-password"`
-4. Save and restart PHP
+4. **配置 Nginx**
 
-### Upload Limits
+网站根目录指向项目根目录，PHP 由 `server/api/` 处理。
 
-Default max file size is **500MB**. To increase it, adjust `upload_max_filesize` and `post_max_size` in PHP settings (宝塔 → PHP → 配置修改).
+5. **（可选）Cloudflare CDN**
 
-### Storage
+参考下方 CDN 配置说明。
 
-All uploaded files are stored in `server/storage/`, which is protected from direct web access. Files are only served through the authenticated PHP download endpoint.
+---
 
-### API Endpoints
+## ☁️ Cloudflare CDN 配置
 
-| Action | Method | Description |
-|--------|--------|-------------|
-| `?action=login` | POST | Authenticate with password |
-| `?action=logout` | GET | End session |
-| `?action=check` | GET | Check auth status |
-| `?action=list` | GET | List all files |
-| `?action=upload` | POST | Upload file (multipart) |
-| `?action=download&file=...` | GET | Download a file |
-| `?action=delete` | POST | Delete a file |
+1. 注册 [Cloudflare](https://cloudflare.com) 并添加域名
+2. DNS 记录开启橙色云朵代理
+3. SSL/TLS 设为 **Full**
+4. 添加 Cache Rule：
+   - `/assets/*` → 缓存 1 个月
+   - `/server/api/*` → 绕过缓存
 
-## Path Rules
+---
 
-- From `index.html`: use `assets/...` and `pages/...`.
-- From files in `pages/`: use `../assets/...` and `../index.html`.
-- API requests from frontend use `server/api/...`.
-# Mingine.top
-# Mingine.top
+## 📡 API 文档
+
+### 评论区 API (`server/api/guestbook.php`)
+
+| 方法 | 参数 | 说明 |
+|:--|:--|:--|
+| `GET` | `?page=1&limit=20&sort=newest` | 分页获取评论列表 |
+| `POST` | `{name, message, email?}` | 发布一级评论 |
+| `POST` | `{name, message, parent_id}` | 发布楼中楼回复 |
+| `POST` | `?action=like` + `{comment_id}` | 点赞/取消点赞 |
+
+### 云盘 API (`server/api/drive.php`)
+
+| 方法 | 参数 | 说明 |
+|:--|:--|:--|
+| `POST` | `?action=login` + `{password}` | 登录验证 |
+| `GET` | `?action=check` | 检查登录状态 |
+| `GET` | `?action=list` | 获取文件列表 |
+| `POST` | `?action=upload` (multipart) | 上传文件 |
+| `GET` | `?action=download&file=文件名` | 下载文件 |
+| `POST` | `?action=delete` + `{filename}` | 删除文件 |
+
+### 聊天 API (`server/api/chat.php`)
+
+| 方法 | 说明 |
+|:--|:--|
+| `POST` | `{message}` → 返回 AI 回复 |
+
+---
+
+## ⚙️ 自动部署 (Git + 宝塔 WebHook)
+
+项目支持 Git push 自动部署：
+
+1. 服务器安装宝塔 WebHook 插件
+2. 添加 Hook 执行脚本：
+   ```bash
+   cd /www/wwwroot/mingine.top && git pull origin main
+   ```
+3. GitHub 仓库 Settings → Webhooks 中填入 Hook URL
+4. 每次 `git push` 后服务器自动拉取更新
+
+---
+
+## 📝 许可
+
+MIT License · 个人站点，欢迎访问。
+
+---
+
+<p align="center">
+  Made with ❤️ by <a href="https://github.com/Mingine">Mingine</a>
+</p>
