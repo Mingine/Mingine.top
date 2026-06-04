@@ -102,16 +102,31 @@ function initTables(PDO $pdo): void
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 }
 
+function realIp(): string
+{
+    // Cloudflare 代理 → 取真实 IP (CF-Connecting-IP)
+    if (!empty($_SERVER['HTTP_CF_CONNECTING_IP'])) {
+        $ip = trim($_SERVER['HTTP_CF_CONNECTING_IP']);
+        if (filter_var($ip, FILTER_VALIDATE_IP)) return $ip;
+    }
+    // X-Forwarded-For 可能有多个 IP，取第一个
+    if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+        $ip = trim(explode(',', $_SERVER['HTTP_X_FORWARDED_FOR'])[0]);
+        if (filter_var($ip, FILTER_VALIDATE_IP)) return $ip;
+    }
+    return $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+}
+
 function visitorHash(): string
 {
-    $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    $ip = realIp();
     $ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
     return hash('sha256', $ip . '|' . $ua);
 }
 
 function visitorIp(): string
 {
-    return $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+    return realIp();
 }
 
 function geoLocation(string $ip): array
@@ -243,11 +258,12 @@ if ($method === 'GET') {
 
     if ($action === 'visitors') {
         $page = max(1, (int)($_GET['page'] ?? 1));
-        $limit = 20;
+        $limit = 10;
         $offset = ($page - 1) * $limit;
 
         $totalStmt = $pdo->query("SELECT COUNT(DISTINCT ip_hash) FROM analytics_pv");
         $total = (int)$totalStmt->fetchColumn();
+        $totalPages = max(1, (int)ceil($total / $limit));
 
         $stmt = $pdo->prepare(
             "SELECT ip_hash, country, province, MAX(created_at) AS lastVisit, COUNT(*) AS visitCount
@@ -264,6 +280,7 @@ if ($method === 'GET') {
         respond(200, [
             'visitors' => $visitors,
             'total' => $total,
+            'totalPages' => $totalPages,
             'page' => $page,
         ]);
     }
