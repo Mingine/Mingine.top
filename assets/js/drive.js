@@ -206,6 +206,7 @@ function formatSize(bytes) {
 // ─── 下载 ─────────────────────────────────
 
 function downloadFile(filename) {
+    if (typeof window.trackModule === 'function') window.trackModule('drive_download');
     const url = API + '?action=download&file=' + encodeURIComponent(filename);
     const a = document.createElement('a');
     a.href = url;
@@ -317,6 +318,7 @@ async function uploadSingle(file) {
 
         if (result.ok && result.data.ok) {
             showToast('上传成功: ' + file.name);
+            if (typeof window.trackModule === 'function') window.trackModule('drive_upload');
         } else {
             showToast((result.data && result.data.error) || '上传失败', 'error');
         }

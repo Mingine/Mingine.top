@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
       chatWindow.style.display = chatWindow.style.display === 'flex' ? 'none' : 'flex';
       if(chatWindow.style.display === 'flex') {
         chatInput.focus();
+        if (typeof window.trackModule === 'function') window.trackModule('ai_chat');
       }
     });
   

@@ -1,6 +1,8 @@
 // 2048 游戏逻辑 (Vanilla JS)
 
 document.addEventListener('DOMContentLoaded', () => {
+    if (typeof window.trackModule === 'function') window.trackModule('game2048');
+
     const grid = document.getElementById('grid');
     const scoreDisplay = document.getElementById('score');
     const restartBtn = document.getElementById('restart-btn');

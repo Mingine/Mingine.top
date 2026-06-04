@@ -272,6 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || '发布失败');
             toast('评论发布成功！');
+            if (typeof window.trackModule === 'function') window.trackModule('guestbook');
             postText.value = '';
             postEmail.value = '';
             randomAvatar();

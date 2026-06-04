@@ -75,6 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const expandWidget = () => {
     if (widget.classList.contains('collapsed')) {
       toggleWidget();
+      if (typeof window.trackModule === 'function') window.trackModule('music');
     }
   };
 
