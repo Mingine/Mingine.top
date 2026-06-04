@@ -158,7 +158,10 @@
     // ==========================================
     // 仪表盘 — 前端逻辑
     // ==========================================
-    const API = '../server/api/analytics.php';
+    const DASH_API = (() => {
+      try { return new URL('../server/api/analytics.php', window.location.href).toString(); }
+      catch(e) { return window.location.origin + '/server/api/analytics.php'; }
+    })();
 
     let trendChart = null;
     let moduleChart = null;
@@ -166,7 +169,7 @@
     // ── 加载看板数据 ──
     async function loadDashboard() {
       try {
-        const res = await fetch(API + '?action=dashboard');
+        const res = await fetch(DASH_API + '?action=dashboard');
         const data = await res.json();
 
         document.getElementById('today-pv').textContent = data.todayPv || 0;
@@ -245,7 +248,7 @@
     // ── 在线人数 ──
     async function loadOnline() {
       try {
-        const res = await fetch(API + '?action=online');
+        const res = await fetch(DASH_API + '?action=online');
         const data = await res.json();
         document.getElementById('online-num').textContent = data.online || 0;
         const detail = document.getElementById('online-detail');
@@ -264,7 +267,7 @@
     // ── 访客列表 ──
     async function loadVisitors() {
       try {
-        const res = await fetch(API + '?action=visitors&page=1');
+        const res = await fetch(DASH_API + '?action=visitors&page=1');
         const data = await res.json();
         const tbody = document.getElementById('visitor-tbody');
         if (!data.visitors || data.visitors.length === 0) {

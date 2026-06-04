@@ -54,11 +54,15 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
 // ==========================================
-// 仪表盘 — 追踪埋点 (PV / 在线心跳)
+// 管理看板 — 追踪埋点 (PV / 在线心跳)
 // ==========================================
 
 (function() {
-  const ANALYTICS_API = '../server/api/analytics.php';
+  // 使用绝对路径，避免 ../ 在不同页面层级解析错误
+  const ANALYTICS_API = (() => {
+    try { return new URL('../server/api/analytics.php', window.location.href).toString(); }
+    catch(e) { return window.location.origin + '/server/api/analytics.php'; }
+  })();
 
   // 生成/获取会话 ID
   let sessionId = localStorage.getItem('_analytics_sid');
@@ -70,23 +74,24 @@ document.addEventListener('DOMContentLoaded', () => {
   // 当前页面路径
   const pagePath = window.location.pathname.replace(/^\/|\/$/g, '') || 'index';
 
-  // 发送埋点 (不阻塞页面)
+  // 发送埋点 (使用 fetch，比 sendBeacon 兼容性更好)
   function postAnalytics(action, data) {
     const body = JSON.stringify(Object.assign({ session_id: sessionId, page: pagePath }, data));
-    try {
-      navigator.sendBeacon
-        ? navigator.sendBeacon(ANALYTICS_API + '?action=' + action, new Blob([body], { type: 'application/json' }))
-        : fetch(ANALYTICS_API + '?action=' + action, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => {});
-    } catch (e) { /* 静默失败 */ }
+    fetch(ANALYTICS_API + '?action=' + action, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: body,
+      keepalive: true
+    }).catch(function() { /* 静默失败 */ });
   }
 
   // 页面加载时上报 PV
-  document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('DOMContentLoaded', function() {
     postAnalytics('track', {});
   });
 
   // 每 30 秒发送心跳
-  setInterval(() => {
+  setInterval(function() {
     postAnalytics('heartbeat', {});
   }, 30000);
 
