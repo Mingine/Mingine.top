@@ -36,7 +36,7 @@ function requireAuth(): void
     $loginTime = $_SESSION['drive_authed_time'] ?? 0;
     if (time() - $loginTime > 86400) {
         unset($_SESSION['drive_authed'], $_SESSION['drive_authed_time']);
-        respond(401, ['error' => '登录已过期（24小时），请重新输入密码']);
+        respond(401, ['error' => '登录已过期，请重新输入密码']);
     }
 }
 

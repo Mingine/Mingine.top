@@ -223,7 +223,7 @@
             '<h2 class="blog-card-title">' + p.title + '</h2>' +
             '<p class="blog-card-excerpt">' + (p.excerpt || '') + '</p>' +
             (tags ? '<div class="blog-card-tags">' + tags + '</div>' : '') +
-            '<div class="blog-card-meta"><span><i class="far fa-calendar"></i> ' + dateStr + '</span><span><i class="far fa-eye"></i> ' + p.views + ' 阅读</span></div>' +
+            '<div class="blog-card-meta"><span><i class="far fa-calendar"></i> ' + dateStr + '</span><span><i class="far fa-eye"></i> ' + p.views + ' 阅读</span><span><i class="far fa-comment-dots"></i> ' + (p.comments || 0) + '</span><span><i class="far fa-heart"></i> ' + (p.likes || 0) + '</span></div>' +
             '</div></article>';
         }).join('');
 
@@ -284,9 +284,31 @@
           '</div>' +
           (post.cover_image ? '<img class="blog-detail-cover" src="' + post.cover_image + '" alt="">' : '') +
           (tags ? '<div class="blog-card-tags" style="margin-bottom:16px;">' + tags + '</div>' : '') +
-          '<div class="blog-detail-content">' + (post.content_html || '') + '</div>';
+          '<div class="blog-detail-content">' + (post.content_html || '') + '</div>' +
+          '<div class="blog-like-bar" style="margin-top:32px;padding:20px 0;text-align:center;border-top:1px solid var(--glass-border);">' +
+            '<button class="blog-like-btn' + (post.liked ? ' liked' : '') + '" id="like-btn" style="display:inline-flex;align-items:center;gap:8px;padding:10px 28px;border:1px solid var(--glass-border);border-radius:999px;background:transparent;color:var(--text-color);font-size:1rem;cursor:pointer;transition:all 0.25s;">' +
+              '<i class="' + (post.liked ? 'fas' : 'far') + ' fa-heart" style="font-size:1.2rem;color:' + (post.liked ? '#ef4444' : 'inherit') + ';"></i>' +
+              '<span id="like-count">' + (post.likes || 0) + '</span>' +
+            '</button>' +
+          '</div>';
         // 侧边栏标签
         document.getElementById('post-tag-list').innerHTML = tags || '<span style="opacity:0.4;font-size:0.82rem;">暂无标签</span>';
+        // 点赞按钮事件
+        document.getElementById('like-btn').addEventListener('click', async () => {
+          const btn = document.getElementById('like-btn');
+          try {
+            const res = await fetch(BLOG_API + '?action=like_post', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: post.id })
+            });
+            const d = await res.json();
+            if (d.ok) {
+              document.getElementById('like-count').textContent = d.likes;
+              const icon = btn.querySelector('i');
+              if (d.liked) { btn.classList.add('liked'); icon.className = 'fas fa-heart'; icon.style.color = '#ef4444'; }
+              else { btn.classList.remove('liked'); icon.className = 'far fa-heart'; icon.style.color = ''; }
+            }
+          } catch(e) {}
+        });
         buildTOC();
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } catch(e) { document.getElementById('detail-content').innerHTML = '<div class="blog-loading">加载失败</div>'; }
