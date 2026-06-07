@@ -18,7 +18,7 @@ register_shutdown_function(function () {
     }
 });
 
-require_once __DIR__ . '/../lib/Markdown.php';
+require_once __DIR__ . '/../../vendor/autoload.php';
 
 // ============================================================
 //  工具函数
@@ -145,7 +145,10 @@ function sanitizeStr(string $s, int $max = 500): string
 
 $pdo = connectDb();
 initTables($pdo);
-$markdown = new Markdown();
+$converter = new \League\CommonMark\CommonMarkConverter([
+    'html_input' => 'strip',
+    'allow_unsafe_links' => false,
+]);
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $action = $_GET['action'] ?? '';
@@ -326,7 +329,7 @@ if ($action === 'create') {
     $existStmt->execute([$slug]);
     if ($existStmt->fetch()) $slug .= '-' . time();
 
-    $contentHtml = $markdown->parse($contentMd);
+    $contentHtml = $converter->convert($contentMd)->getContent();
     $now = gmdate('c');
 
     $pdo->prepare(
@@ -360,7 +363,7 @@ if ($action === 'update') {
     if ($title === '') respond(400, ['error' => '标题不能为空']);
     if ($excerpt === '') $excerpt = function_exists('mb_substr') ? mb_substr(strip_tags($contentMd), 0, 200) : substr(strip_tags($contentMd), 0, 200);
 
-    $contentHtml = $markdown->parse($contentMd);
+    $contentHtml = $converter->convert($contentMd)->getContent();
     $now = gmdate('c');
 
     $pdo->prepare(
