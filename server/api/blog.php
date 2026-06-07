@@ -83,13 +83,6 @@ function initTables(PDO $pdo): void
         UNIQUE KEY uk_slug (slug)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
-    $pdo->exec("CREATE TABLE IF NOT EXISTS blog_tags (
-        id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(30) NOT NULL, slug VARCHAR(40) NOT NULL,
-        created_at VARCHAR(40) NOT NULL,
-        UNIQUE KEY uk_slug (slug)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
     $pdo->exec("CREATE TABLE IF NOT EXISTS blog_posts (
         id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
         title VARCHAR(200) NOT NULL, slug VARCHAR(220) NOT NULL,
@@ -97,6 +90,7 @@ function initTables(PDO $pdo): void
         excerpt VARCHAR(500) NOT NULL DEFAULT '',
         category_id INT UNSIGNED DEFAULT NULL,
         cover_image VARCHAR(500) NOT NULL DEFAULT '',
+        tags_json TEXT,
         is_published TINYINT(1) NOT NULL DEFAULT 0,
         views INT UNSIGNED NOT NULL DEFAULT 0,
         created_at VARCHAR(40) NOT NULL, updated_at VARCHAR(40) NOT NULL,
@@ -104,10 +98,7 @@ function initTables(PDO $pdo): void
         KEY idx_category (category_id), KEY idx_published (is_published), KEY idx_created (created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
-    $pdo->exec("CREATE TABLE IF NOT EXISTS blog_post_tags (
-        post_id INT UNSIGNED NOT NULL, tag_id INT UNSIGNED NOT NULL,
-        PRIMARY KEY (post_id, tag_id), KEY idx_tag (tag_id)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    try { $pdo->exec("ALTER TABLE blog_posts ADD COLUMN tags_json TEXT"); } catch (Throwable $e) {}
 }
 
 function slugify(string $text): string
@@ -177,8 +168,8 @@ if ($method === 'GET') {
             if ($catId) { $where .= " AND p.category_id = ?"; $params[] = (int)$catId; }
         }
         if ($tag !== '') {
-            $where .= " AND p.id IN (SELECT pt.post_id FROM blog_post_tags pt JOIN blog_tags t ON pt.tag_id = t.id WHERE t.slug = ?)";
-            $params[] = $tag;
+            $where .= " AND p.tags_json IS NOT NULL AND p.tags_json LIKE ?";
+            $params[] = '%"' . $tag . '"%';
         }
         if ($search !== '') {
             $where .= " AND (p.title LIKE ? OR p.excerpt LIKE ?)";
@@ -191,7 +182,7 @@ if ($method === 'GET') {
         $total = (int)$cntStmt->fetchColumn();
         $totalPages = max(1, (int)ceil($total / $limit));
 
-        $sql = "SELECT p.id, p.title, p.slug, p.excerpt, p.cover_image, p.views, p.created_at,
+        $sql = "SELECT p.id, p.title, p.slug, p.excerpt, p.cover_image, p.tags_json, p.views, p.created_at,
                        c.name AS category_name, c.slug AS category_slug
                 FROM blog_posts p
                 LEFT JOIN blog_categories c ON p.category_id = c.id
@@ -202,23 +193,12 @@ if ($method === 'GET') {
         $stmt->execute($params);
         $posts = $stmt->fetchAll();
 
-        // 加载标签
-        if (!empty($posts)) {
-            $ids = array_column($posts, 'id');
-            $ph = implode(',', array_fill(0, count($ids), '?'));
-            $tagStmt = $pdo->prepare(
-                "SELECT pt.post_id, t.name, t.slug FROM blog_post_tags pt
-                 JOIN blog_tags t ON pt.tag_id = t.id WHERE pt.post_id IN ($ph)"
-            );
-            $tagStmt->execute($ids);
-            $tagMap = [];
-            foreach ($tagStmt->fetchAll() as $row) {
-                $tagMap[(int)$row['post_id']][] = ['name' => $row['name'], 'slug' => $row['slug']];
-            }
-            foreach ($posts as &$post) {
-                $post['tags'] = $tagMap[(int)$post['id']] ?? [];
-            }
+        foreach ($posts as &$post) {
+            $decoded = json_decode($post['tags_json'] ?? '[]', true);
+            $post['tags'] = is_array($decoded) ? array_map(fn($n) => ['name' => $n], $decoded) : [];
+            unset($post['tags_json']);
         }
+        unset($post);
 
         respond(200, ['posts' => $posts, 'pagination' => ['page' => $page, 'totalPages' => $totalPages, 'total' => $total]]);
     }
@@ -237,14 +217,10 @@ if ($method === 'GET') {
         $post = $stmt->fetch();
         if (!$post) respond(404, ['error' => '文章不存在']);
 
-        // 加载标签
-        $tagStmt = $pdo->prepare(
-            "SELECT t.name, t.slug FROM blog_post_tags pt JOIN blog_tags t ON pt.tag_id = t.id WHERE pt.post_id = ?"
-        );
-        $tagStmt->execute([(int)$post['id']]);
-        $post['tags'] = $tagStmt->fetchAll();
+        $decoded = json_decode($post['tags_json'] ?? '[]', true);
+        $post['tags'] = is_array($decoded) ? array_map(fn($n) => ['name' => $n], $decoded) : [];
+        unset($post['tags_json']);
 
-        // 增加阅读量
         $pdo->prepare("UPDATE blog_posts SET views = views + 1 WHERE id = ?")->execute([(int)$post['id']]);
 
         respond(200, ['post' => $post]);
@@ -258,16 +234,6 @@ if ($method === 'GET') {
              GROUP BY c.id ORDER BY c.name"
         );
         respond(200, ['categories' => $stmt->fetchAll()]);
-    }
-
-    // ── 标签列表 ──
-    if ($action === 'tags') {
-        $stmt = $pdo->query(
-            "SELECT t.*, COUNT(pt.post_id) AS post_count FROM blog_tags t
-             LEFT JOIN blog_post_tags pt ON pt.tag_id = t.id
-             GROUP BY t.id ORDER BY post_count DESC"
-        );
-        respond(200, ['tags' => $stmt->fetchAll()]);
     }
 
     // ── 管理后台：文章列表（含未发布） ──
@@ -319,7 +285,9 @@ if ($action === 'create') {
     $categoryId = $input['category_id'] ? (int)$input['category_id'] : null;
     $coverImage = sanitizeStr($input['cover_image'] ?? '', 500);
     $isPublished = !empty($input['is_published']) ? 1 : 0;
-    $tagIds = isset($input['tag_ids']) && is_array($input['tag_ids']) ? $input['tag_ids'] : [];
+    $tagNames = isset($input['tags']) && is_array($input['tags']) ? $input['tags'] : [];
+    $tagNames = array_values(array_unique(array_filter(array_map(fn($t) => trim((string)$t), $tagNames), fn($t) => $t !== '')));
+    $tagsJson = json_encode($tagNames, JSON_UNESCAPED_UNICODE);
 
     if ($title === '') respond(400, ['error' => '标题不能为空']);
     if ($excerpt === '') $excerpt = function_exists('mb_substr') ? mb_substr(strip_tags($contentMd), 0, 200) : substr(strip_tags($contentMd), 0, 200);
@@ -334,18 +302,10 @@ if ($action === 'create') {
     $now = gmdate('c');
 
     $pdo->prepare(
-        "INSERT INTO blog_posts (title, slug, content_md, content_html, excerpt, category_id, cover_image, is_published, created_at, updated_at)
-         VALUES (?,?,?,?,?,?,?,?,?,?)"
-    )->execute([$title, $slug, $contentMd, $contentHtml, $excerpt, $categoryId, $coverImage, $isPublished, $now, $now]);
-
-    $postId = (int)$pdo->lastInsertId();
-
-    // 关联标签
-    foreach ($tagIds as $tid) {
-        $pdo->prepare("INSERT IGNORE INTO blog_post_tags (post_id, tag_id) VALUES (?,?)")->execute([$postId, (int)$tid]);
-    }
-
-    respond(200, ['ok' => true, 'slug' => $slug, 'id' => $postId]);
+        "INSERT INTO blog_posts (title, slug, content_md, content_html, excerpt, category_id, cover_image, tags_json, is_published, created_at, updated_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?)"
+    )->execute([$title, $slug, $contentMd, $contentHtml, $excerpt, $categoryId, $coverImage, $tagsJson, $isPublished, $now, $now]);
+    respond(200, ['ok' => true, 'slug' => $slug]);
 }
 
 // ── 更新文章 ──
@@ -359,7 +319,9 @@ if ($action === 'update') {
     $categoryId = $input['category_id'] ? (int)$input['category_id'] : null;
     $coverImage = sanitizeStr($input['cover_image'] ?? '', 500);
     $isPublished = !empty($input['is_published']) ? 1 : 0;
-    $tagIds = isset($input['tag_ids']) && is_array($input['tag_ids']) ? $input['tag_ids'] : [];
+    $tagNames = isset($input['tags']) && is_array($input['tags']) ? $input['tags'] : [];
+    $tagNames = array_values(array_unique(array_filter(array_map(fn($t) => trim((string)$t), $tagNames), fn($t) => $t !== '')));
+    $tagsJson = json_encode($tagNames, JSON_UNESCAPED_UNICODE);
 
     if ($title === '') respond(400, ['error' => '标题不能为空']);
     if ($excerpt === '') $excerpt = function_exists('mb_substr') ? mb_substr(strip_tags($contentMd), 0, 200) : substr(strip_tags($contentMd), 0, 200);
@@ -368,15 +330,8 @@ if ($action === 'update') {
     $now = gmdate('c');
 
     $pdo->prepare(
-        "UPDATE blog_posts SET title=?, content_md=?, content_html=?, excerpt=?, category_id=?, cover_image=?, is_published=?, updated_at=? WHERE id=?"
-    )->execute([$title, $contentMd, $contentHtml, $excerpt, $categoryId, $coverImage, $isPublished, $now, $id]);
-
-    // 更新标签
-    $pdo->prepare("DELETE FROM blog_post_tags WHERE post_id = ?")->execute([$id]);
-    foreach ($tagIds as $tid) {
-        $pdo->prepare("INSERT IGNORE INTO blog_post_tags (post_id, tag_id) VALUES (?,?)")->execute([$id, (int)$tid]);
-    }
-
+        "UPDATE blog_posts SET title=?, content_md=?, content_html=?, excerpt=?, category_id=?, cover_image=?, tags_json=?, is_published=?, updated_at=? WHERE id=?"
+    )->execute([$title, $contentMd, $contentHtml, $excerpt, $categoryId, $coverImage, $tagsJson, $isPublished, $now, $id]);
     respond(200, ['ok' => true]);
 }
 
@@ -384,7 +339,6 @@ if ($action === 'update') {
 if ($action === 'delete') {
     $id = (int)($input['id'] ?? 0);
     if ($id <= 0) respond(400, ['error' => '缺少 id']);
-    $pdo->prepare("DELETE FROM blog_post_tags WHERE post_id = ?")->execute([$id]);
     $pdo->prepare("DELETE FROM blog_posts WHERE id = ?")->execute([$id]);
     respond(200, ['ok' => true]);
 }
@@ -398,13 +352,13 @@ if ($action === 'create_category') {
     respond(200, ['ok' => true, 'slug' => $slug]);
 }
 
-// ── 创建标签 ──
-if ($action === 'create_tag') {
-    $name = sanitizeStr($input['name'] ?? '', 30);
-    if ($name === '') respond(400, ['error' => '名称不能为空']);
-    $slug = slugify($name);
-    $pdo->prepare("INSERT IGNORE INTO blog_tags (name, slug, created_at) VALUES (?,?,?)")->execute([$name, $slug, gmdate('c')]);
-    respond(200, ['ok' => true, 'slug' => $slug]);
+// ── 删除分类 ──
+if ($action === 'delete_category') {
+    $id = (int)($input['id'] ?? 0);
+    if ($id <= 0) respond(400, ['error' => '缺少 id']);
+    $pdo->prepare("UPDATE blog_posts SET category_id = NULL WHERE category_id = ?")->execute([$id]);
+    $pdo->prepare("DELETE FROM blog_categories WHERE id = ?")->execute([$id]);
+    respond(200, ['ok' => true]);
 }
 
 respond(400, ['error' => '未知操作']);

@@ -9,10 +9,9 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     .blog-page { min-height: 100vh; background: var(--bg-color); }
-    .blog-container { max-width: 1200px; margin: calc(var(--nav-height) + 30px) auto 40px auto; padding: 0 16px; display: grid; grid-template-columns: 200px 1fr 200px; gap: 20px; }
+    .blog-container { max-width: 1200px; margin: calc(var(--nav-height) + 30px) auto 40px auto; padding: 0 20px; display: grid; grid-template-columns: 1fr 220px; gap: 24px; }
     .blog-main { min-width: 0; }
-    @media (max-width: 900px) { .blog-container { grid-template-columns: 1fr 180px; } .blog-toc-col { display: none !important; } }
-    @media (max-width: 640px) { .blog-container { grid-template-columns: 1fr; } .blog-toc-col,.blog-sidebar-col { display: none !important; } }
+    @media (max-width: 768px) { .blog-container { grid-template-columns: 1fr; } .blog-toc { display: none !important; } }
 
     /* 文章列表 */
     .blog-posts { display: flex; flex-direction: column; gap: 20px; }
@@ -101,9 +100,9 @@
 
     .blog-loading { text-align: center; padding: 60px; opacity: 0.5; }
 
-    /* 文章目录 */
-    .blog-toc-col { display: none; position: sticky; top: calc(var(--nav-height) + 20px); align-self: start; max-height: calc(100vh - 120px); overflow-y: auto; }
-    .blog-toc-col.active { display: block; }
+    /* 文章目录（详情页内左侧） */
+    .blog-toc { display: none; width: 180px; flex-shrink: 0; position: sticky; top: calc(var(--nav-height) + 20px); align-self: start; max-height: calc(100vh - 120px); overflow-y: auto; }
+    .blog-toc.active { display: block; }
     .blog-toc-title { font-size: 0.9rem; font-weight: 700; margin-bottom: 10px; opacity: 0.7; }
     .blog-toc-list { list-style: none; padding: 0; margin: 0; }
     .blog-toc-item { padding: 5px 0; font-size: 0.82rem; border-left: 2px solid transparent; padding-left: 10px; transition: all 0.2s; cursor: pointer; line-height: 1.35; }
@@ -126,13 +125,6 @@
   </nav>
 
   <div class="blog-container">
-    <!-- TOC 目录列 -->
-    <aside class="blog-toc-col" id="blog-toc-col">
-      <div class="blog-toc-title"><i class="fas fa-list"></i> 目录</div>
-      <ul class="blog-toc-list" id="toc-list"></ul>
-    </aside>
-
-    <!-- 主内容区 -->
     <div class="blog-main">
       <div id="blog-list-view">
         <h1 style="font-size:1.6rem;margin-bottom:20px;"><i class="fas fa-blog"></i> 博客文章</h1>
@@ -140,19 +132,27 @@
         <div class="blog-pagination" id="blog-pagination"></div>
       </div>
 
-      <!-- 文章详情 -->
       <div class="blog-detail" id="blog-detail">
         <button class="blog-back" onclick="showList()"><i class="fas fa-arrow-left"></i> 返回列表</button>
-        <div id="detail-content"></div>
+        <div style="display:flex;gap:24px;">
+          <aside class="blog-toc" id="blog-toc">
+            <div class="blog-toc-title"><i class="fas fa-list"></i> 目录</div>
+            <ul class="blog-toc-list" id="toc-list"></ul>
+          </aside>
+          <div id="detail-content" style="flex:1;min-width:0;"></div>
+        </div>
       </div>
     </div>
 
-    <!-- 分类侧边栏 -->
-    <aside class="blog-sidebar-col" id="blog-sidebar-col">
+    <aside class="blog-sidebar-col">
       <div class="blog-sidebar">
-        <div class="blog-sidebar-card glass">
+        <div class="blog-sidebar-card glass" id="sidebar-cat-card">
           <h3><i class="fas fa-folder"></i> 分类</h3>
           <div class="blog-sidebar-list" id="category-list"><span style="opacity:0.5;font-size:0.85rem;">加载中...</span></div>
+        </div>
+        <div class="blog-sidebar-card glass" id="sidebar-tag-card" style="display:none;">
+          <h3><i class="fas fa-tags"></i> 文章标签</h3>
+          <div class="blog-sidebar-list" id="post-tag-list"><span style="opacity:0.4;font-size:0.82rem;">—</span></div>
         </div>
       </div>
     </aside>
@@ -264,6 +264,9 @@
       const detail = document.getElementById('blog-detail');
       detail.classList.add('active');
       document.getElementById('detail-content').innerHTML = '<div class="blog-loading">加载中...</div>';
+      // 切换侧边栏：分类 → 标签
+      document.getElementById('sidebar-cat-card').style.display = 'none';
+      document.getElementById('sidebar-tag-card').style.display = 'block';
       try {
         const res = await fetch(BLOG_API + '?action=post&slug=' + slug);
         const data = await res.json();
@@ -282,6 +285,8 @@
           (post.cover_image ? '<img class="blog-detail-cover" src="' + post.cover_image + '" alt="">' : '') +
           (tags ? '<div class="blog-card-tags" style="margin-bottom:16px;">' + tags + '</div>' : '') +
           '<div class="blog-detail-content">' + (post.content_html || '') + '</div>';
+        // 侧边栏标签
+        document.getElementById('post-tag-list').innerHTML = tags || '<span style="opacity:0.4;font-size:0.82rem;">暂无标签</span>';
         buildTOC();
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } catch(e) { document.getElementById('detail-content').innerHTML = '<div class="blog-loading">加载失败</div>'; }
@@ -289,12 +294,12 @@
 
     // ── 生成目录 ──
     function buildTOC() {
-      const tocCol = document.getElementById('blog-toc-col');
+      const tocEl = document.getElementById('blog-toc');
       const tocList = document.getElementById('toc-list');
       const content = document.getElementById('detail-content');
       const headings = content.querySelectorAll('.blog-detail-content h2, .blog-detail-content h3');
-      if (headings.length === 0) { tocCol.classList.remove('active'); return; }
-      tocCol.classList.add('active');
+      if (headings.length === 0) { tocEl.classList.remove('active'); return; }
+      tocEl.classList.add('active');
       tocList.innerHTML = '';
       headings.forEach((h, i) => {
         const id = h.id || ('toc-' + i);
@@ -310,8 +315,6 @@
         });
         tocList.appendChild(li);
       });
-
-      // 滚动高亮
       const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
           if (entry.isIntersecting) {
@@ -327,7 +330,9 @@
     function showList() {
       document.getElementById('blog-list-view').style.display = 'block';
       document.getElementById('blog-detail').classList.remove('active');
-      document.getElementById('blog-toc-col').classList.remove('active');
+      document.getElementById('blog-toc').classList.remove('active');
+      document.getElementById('sidebar-cat-card').style.display = 'block';
+      document.getElementById('sidebar-tag-card').style.display = 'none';
     }
 
     // ── URL 参数检测：?slug=xxx 直达文章 ──

@@ -112,12 +112,12 @@
         </div>
         <div class="editor-field" style="display:flex;gap:12px;flex-wrap:wrap;">
           <div style="flex:1;min-width:160px;">
-            <label>分类 <button type="button" id="btn-add-cat" class="admin-btn outline" style="font-size:0.7rem;padding:2px 8px;margin-left:6px;">+ 新建</button></label>
+            <label>分类 <button type="button" id="btn-add-cat" class="admin-btn outline" style="font-size:0.7rem;padding:2px 8px;margin-left:6px;">+ 新建</button> <button type="button" id="btn-del-cat" class="admin-btn danger" style="font-size:0.7rem;padding:2px 8px;" title="删除当前选中分类">🗑</button></label>
             <select id="ed-category"><option value="">无分类</option></select>
           </div>
           <div style="flex:2;min-width:200px;">
-            <label>标签 (Ctrl+点击多选) <button type="button" id="btn-add-tag" class="admin-btn outline" style="font-size:0.7rem;padding:2px 8px;margin-left:6px;">+ 新建</button></label>
-            <select id="ed-tags" multiple style="height:100px;"></select>
+            <label>标签（逗号分隔，每篇文章独立）</label>
+            <input type="text" id="ed-tags-input" placeholder="例如: JavaScript, 教程, 前端" maxlength="200" />
           </div>
         </div>
         <div class="editor-field">
@@ -214,14 +214,10 @@
     // ── 加载分类/标签选项 ──
     async function loadEditorData() {
       try {
-        const [cRes, tRes] = await Promise.all([
-          fetch(BLOG_API + '?action=categories'), fetch(BLOG_API + '?action=tags')
-        ]);
-        const cats = await cRes.json(); const tags = await tRes.json();
+        const cRes = await fetch(BLOG_API + '?action=categories');
+        const cats = await cRes.json();
         const catSel = document.getElementById('ed-category');
         catSel.innerHTML = '<option value="">无分类</option>' + (cats.categories || []).map(c => '<option value="' + c.id + '">' + c.name + '</option>').join('');
-        const tagSel = document.getElementById('ed-tags');
-        tagSel.innerHTML = (tags.tags || []).map(t => '<option value="' + t.id + '">' + t.name + '</option>').join('');
       } catch(e) {}
     }
 
@@ -239,17 +235,19 @@
       } catch(e) { toast('请求失败', 'error'); }
     });
 
-    // ── 创建标签 ──
-    document.getElementById('btn-add-tag').addEventListener('click', async () => {
-      const name = prompt('输入新标签名称:');
-      if (!name || !name.trim()) return;
+    // ── 删除分类 ──
+    document.getElementById('btn-del-cat').addEventListener('click', async () => {
+      const sel = document.getElementById('ed-category');
+      const id = sel.value;
+      if (!id) { toast('请先选择要删除的分类', 'error'); return; }
+      if (!confirm('确定删除分类 "' + sel.options[sel.selectedIndex].text + '"？相关文章的分类将清空。')) return;
       try {
-        const res = await fetch(BLOG_API + '?action=create_tag', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name.trim() })
+        const res = await fetch(BLOG_API + '?action=delete_category', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: parseInt(id) })
         });
         const data = await res.json();
-        if (res.ok && data.ok) { toast('标签已创建'); loadEditorData(); }
-        else toast(data.error || '创建失败', 'error');
+        if (res.ok && data.ok) { toast('分类已删除'); sel.value = ''; loadEditorData(); }
+        else toast(data.error || '删除失败', 'error');
       } catch(e) { toast('请求失败', 'error'); }
     });
 
@@ -263,7 +261,7 @@
       document.getElementById('ed-cover').value = '';
       document.getElementById('ed-published').checked = true;
       document.getElementById('ed-category').value = '';
-      document.getElementById('ed-tags').selectedIndex = -1;
+      document.getElementById('ed-tags-input').value = '';
       document.getElementById('editor-wrap').classList.add('active');
       document.getElementById('post-list-wrap').style.display = 'none';
     });
@@ -282,12 +280,9 @@
         document.getElementById('ed-cover').value = post.cover_image || '';
         document.getElementById('ed-published').checked = post.is_published == 1;
         document.getElementById('ed-category').value = post.category_id || '';
-        // 加载文章标签
-        const tagsRes = await fetch(BLOG_API + '?action=post&slug=' + post.slug);
-        const postData = await tagsRes.json();
-        const tagSel = document.getElementById('ed-tags');
-        const postTagIds = (postData.post && postData.post.tags || []).map(t => t.id || 0);
-        Array.from(tagSel.options).forEach(o => o.selected = postTagIds.includes(parseInt(o.value)));
+        let tagArr = [];
+        try { tagArr = JSON.parse(post.tags_json || '[]'); } catch(e) {}
+        document.getElementById('ed-tags-input').value = Array.isArray(tagArr) ? tagArr.join(', ') : '';
         document.getElementById('editor-wrap').classList.add('active');
         document.getElementById('post-list-wrap').style.display = 'none';
       } catch(e) {}
@@ -311,14 +306,15 @@
     document.getElementById('btn-save').addEventListener('click', async () => {
       const title = document.getElementById('ed-title').value.trim();
       if (!title) { toast('标题不能为空', 'error'); return; }
-      const tagIds = Array.from(document.getElementById('ed-tags').selectedOptions).map(o => parseInt(o.value)).filter(Boolean);
+      const tagStr = document.getElementById('ed-tags-input').value.trim();
+      const tags = tagStr ? tagStr.split(/[,，\s]+/).filter(Boolean) : [];
       const payload = {
         title, content_md: document.getElementById('ed-content').value,
         excerpt: document.getElementById('ed-excerpt').value.trim(),
         category_id: document.getElementById('ed-category').value || null,
         cover_image: document.getElementById('ed-cover').value.trim(),
         is_published: document.getElementById('ed-published').checked ? 1 : 0,
-        tag_ids: tagIds
+        tags: tags
       };
       if (editingId) payload.id = editingId;
       const action = editingId ? 'update' : 'create';
