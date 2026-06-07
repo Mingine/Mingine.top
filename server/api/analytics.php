@@ -1,21 +1,8 @@
 <?php
 declare(strict_types=1);
 
-set_error_handler(function ($s, $m, $f, $l) {
-    if (!(error_reporting() & $s)) return false;
-    throw new ErrorException($m, 0, $s, $f, $l);
-});
-set_exception_handler(function ($e) {
-    ob_clean();
-    http_response_code(500);
-    echo json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
-    exit;
-});
-
-ob_start();
-error_reporting(E_ALL);
+error_reporting(E_ERROR | E_PARSE);
 ini_set('display_errors', '0');
-ini_set('html_errors', '0');
 header('Content-Type: application/json; charset=utf-8');
 
 // ============================================================
@@ -24,7 +11,6 @@ header('Content-Type: application/json; charset=utf-8');
 
 function respond(int $code, array $payload): void
 {
-    ob_clean();
     http_response_code($code);
     echo json_encode($payload, JSON_UNESCAPED_UNICODE);
     exit;

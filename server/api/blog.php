@@ -1,25 +1,22 @@
 <?php
 declare(strict_types=1);
 
-// 自定义错误处理：将所有错误转为 JSON，杜绝 HTML 污染
-set_error_handler(function ($severity, $message, $file, $line) {
-    if (!(error_reporting() & $severity)) return false;
-    throw new ErrorException($message, 0, $severity, $file, $line);
-});
-set_exception_handler(function ($e) {
-    ob_clean();
-    http_response_code(500);
-    echo json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
-    exit;
-});
-
-ob_start();
-error_reporting(E_ALL);
+error_reporting(E_ERROR | E_PARSE);
 ini_set('display_errors', '0');
-ini_set('html_errors', '0');
+ini_set('log_errors', '1');
 header('Content-Type: application/json; charset=utf-8');
 
+// 会话必须在任何输出之前启动
 session_start();
+
+// 兜底捕获所有致命错误
+register_shutdown_function(function () {
+    $error = error_get_last();
+    if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+        http_response_code(500);
+        echo json_encode(['error' => '服务器内部错误: ' . $error['message']], JSON_UNESCAPED_UNICODE);
+    }
+});
 
 require_once __DIR__ . '/../../vendor/autoload.php';
 
@@ -29,7 +26,6 @@ require_once __DIR__ . '/../../vendor/autoload.php';
 
 function respond(int $code, array $payload): void
 {
-    ob_clean();
     http_response_code($code);
     echo json_encode($payload, JSON_UNESCAPED_UNICODE);
     exit;
@@ -97,25 +93,13 @@ function initTables(PDO $pdo): void
         tags_json TEXT,
         is_published TINYINT(1) NOT NULL DEFAULT 0,
         views INT UNSIGNED NOT NULL DEFAULT 0,
-        likes INT UNSIGNED NOT NULL DEFAULT 0,
         created_at VARCHAR(40) NOT NULL, updated_at VARCHAR(40) NOT NULL,
         UNIQUE KEY uk_slug (slug),
         KEY idx_category (category_id), KEY idx_published (is_published), KEY idx_created (created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
     try { $pdo->exec("ALTER TABLE blog_posts ADD COLUMN tags_json TEXT"); } catch (Throwable $e) {}
-    try { $pdo->exec("ALTER TABLE blog_posts ADD COLUMN likes INT UNSIGNED NOT NULL DEFAULT 0"); } catch (Throwable $e) {}
-
-    try {
-        $pdo->exec("CREATE TABLE IF NOT EXISTS blog_likes (
-            id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-            post_id INT UNSIGNED NOT NULL,
-            ip_hash VARCHAR(64) NOT NULL,
-            created_at VARCHAR(40) NOT NULL,
-            UNIQUE KEY uk_like (post_id, ip_hash),
-            KEY idx_post (post_id)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-    } catch (Throwable $e) {}
+}
 
 function slugify(string $text): string
 {
@@ -156,8 +140,6 @@ $converter = new \League\CommonMark\GithubFlavoredMarkdownConverter([
     'html_input' => 'strip',
     'allow_unsafe_links' => false,
 ]);
-
-try {
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $action = $_GET['action'] ?? '';
@@ -200,7 +182,7 @@ if ($method === 'GET') {
         $total = (int)$cntStmt->fetchColumn();
         $totalPages = max(1, (int)ceil($total / $limit));
 
-        $sql = "SELECT p.id, p.title, p.slug, p.excerpt, p.cover_image, p.tags_json, p.views, p.likes, p.created_at,
+        $sql = "SELECT p.id, p.title, p.slug, p.excerpt, p.cover_image, p.tags_json, p.views, p.created_at,
                        c.name AS category_name, c.slug AS category_slug
                 FROM blog_posts p
                 LEFT JOIN blog_categories c ON p.category_id = c.id
@@ -215,12 +197,6 @@ if ($method === 'GET') {
             $decoded = json_decode($post['tags_json'] ?? '[]', true);
             $post['tags'] = is_array($decoded) ? array_map(fn($n) => ['name' => $n], $decoded) : [];
             unset($post['tags_json']);
-            // 评论数（source 列可能尚未由 guestbook.php 创建）
-            try {
-                $cnt = $pdo->prepare("SELECT COUNT(*) FROM guestbook_entries WHERE source = ?");
-                $cnt->execute(['blog:' . $post['id']]);
-                $post['comment_count'] = (int)$cnt->fetchColumn();
-            } catch (Throwable $e) { $post['comment_count'] = 0; }
         }
         unset($post);
 
@@ -246,19 +222,6 @@ if ($method === 'GET') {
         unset($post['tags_json']);
 
         $pdo->prepare("UPDATE blog_posts SET views = views + 1 WHERE id = ?")->execute([(int)$post['id']]);
-
-        // 评论数
-        try {
-            $cnt = $pdo->prepare("SELECT COUNT(*) FROM guestbook_entries WHERE source = ?");
-            $cnt->execute(['blog:' . $post['id']]);
-            $post['comment_count'] = (int)$cnt->fetchColumn();
-        } catch (Throwable $e) { $post['comment_count'] = 0; }
-
-        // 当前访客是否已点赞
-        $vHash = hash('sha256', ($_SERVER['REMOTE_ADDR'] ?? '') . '|' . ($_SERVER['HTTP_USER_AGENT'] ?? ''));
-        $likeStmt = $pdo->prepare("SELECT id FROM blog_likes WHERE post_id = ? AND ip_hash = ?");
-        $likeStmt->execute([(int)$post['id'], $vHash]);
-        $post['liked'] = (bool)$likeStmt->fetch();
 
         respond(200, ['post' => $post]);
     }
@@ -310,28 +273,6 @@ if ($action === 'login') {
     if ($pw !== $stored) respond(403, ['error' => '密码错误']);
     $_SESSION['blog_authed'] = true;
     respond(200, ['ok' => true]);
-}
-
-// ── 文章点赞/取消 ──（无需登录）
-if ($action === 'post_like') {
-    $postId = (int)($input['post_id'] ?? 0);
-    if ($postId <= 0) respond(400, ['error' => '缺少 post_id']);
-    $vHash = hash('sha256', ($_SERVER['REMOTE_ADDR'] ?? '') . '|' . ($_SERVER['HTTP_USER_AGENT'] ?? ''));
-    $existStmt = $pdo->prepare("SELECT id FROM blog_likes WHERE post_id = ? AND ip_hash = ?");
-    $existStmt->execute([$postId, $vHash]);
-    $existing = $existStmt->fetch();
-    if ($existing) {
-        $pdo->prepare("DELETE FROM blog_likes WHERE id = ?")->execute([$existing['id']]);
-        $pdo->prepare("UPDATE blog_posts SET likes = GREATEST(likes - 1, 0) WHERE id = ?")->execute([$postId]);
-        $newLikes = $pdo->query("SELECT likes FROM blog_posts WHERE id = $postId")->fetchColumn();
-        respond(200, ['ok' => true, 'action' => 'unliked', 'likes' => (int)$newLikes]);
-    } else {
-        $pdo->prepare("INSERT INTO blog_likes (post_id, ip_hash, created_at) VALUES (?,?,?)")->execute([$postId, $vHash, gmdate('c')]);
-        $pdo->prepare("UPDATE blog_posts SET likes = likes + 1 WHERE id = ?")->execute([$postId]);
-        $newLikes = $pdo->query("SELECT likes FROM blog_posts WHERE id = $postId")->fetchColumn();
-        respond(200, ['ok' => true, 'action' => 'liked', 'likes' => (int)$newLikes]);
-    }
-    exit;
 }
 
 requireAuth();
@@ -421,7 +362,3 @@ if ($action === 'delete_category') {
 }
 
 respond(400, ['error' => '未知操作']);
-
-} catch (Throwable $e) {
-    respond(500, ['error' => $e->getMessage()]);
-}

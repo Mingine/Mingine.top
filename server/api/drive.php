@@ -1,21 +1,8 @@
 <?php
 declare(strict_types=1);
 
-set_error_handler(function ($s, $m, $f, $l) {
-    if (!(error_reporting() & $s)) return false;
-    throw new ErrorException($m, 0, $s, $f, $l);
-});
-set_exception_handler(function ($e) {
-    ob_clean();
-    http_response_code(500);
-    echo json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
-    exit;
-});
-
-ob_start();
-error_reporting(E_ALL);
+error_reporting(E_ERROR | E_PARSE);
 ini_set('display_errors', '0');
-ini_set('html_errors', '0');
 
 session_start();
 
@@ -23,7 +10,6 @@ session_start();
 
 function respond(int $code, array $payload): void
 {
-    ob_clean();
     http_response_code($code);
     echo json_encode($payload, JSON_UNESCAPED_UNICODE);
     exit;
@@ -50,7 +36,7 @@ function requireAuth(): void
     $loginTime = $_SESSION['drive_authed_time'] ?? 0;
     if (time() - $loginTime > 86400) {
         unset($_SESSION['drive_authed'], $_SESSION['drive_authed_time']);
-        respond(401, ['error' => '登录已过期，请重新输入密码']);
+        respond(401, ['error' => '登录已过期（24小时），请重新输入密码']);
     }
 }
 

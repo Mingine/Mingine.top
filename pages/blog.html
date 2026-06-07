@@ -110,15 +110,6 @@
     .blog-toc-item.toc-h2 { padding-left: 8px; font-weight: 600; }
     .blog-toc-item.toc-h3 { padding-left: 20px; font-size: 0.78rem; opacity: 0.8; }
     .blog-toc-item a { color: inherit; text-decoration: none; display: block; }
-
-    /* 博客点赞按钮 */
-    .bili-blog-like-btn {
-      display: inline-flex; align-items: center; gap: 6px; padding: 10px 28px;
-      border: 1px solid var(--glass-border); border-radius: 24px; background: transparent;
-      color: var(--text-color); font-size: 0.95rem; cursor: pointer; transition: all 0.2s;
-    }
-    .bili-blog-like-btn:hover { border-color: #ef4444; color: #ef4444; }
-    .bili-blog-like-btn.liked { border-color: #ef4444; color: #ef4444; background: rgba(239,68,68,0.06); }
   </style>
 </head>
 <body class="blog-page">
@@ -232,7 +223,7 @@
             '<h2 class="blog-card-title">' + p.title + '</h2>' +
             '<p class="blog-card-excerpt">' + (p.excerpt || '') + '</p>' +
             (tags ? '<div class="blog-card-tags">' + tags + '</div>' : '') +
-            '<div class="blog-card-meta"><span><i class="far fa-calendar"></i> ' + dateStr + '</span><span><i class="far fa-eye"></i> ' + p.views + ' 阅读</span><span><i class="far fa-comment-dots"></i> ' + (p.comment_count || 0) + '</span><span><i class="far fa-heart"></i> ' + (p.likes || 0) + '</span></div>' +
+            '<div class="blog-card-meta"><span><i class="far fa-calendar"></i> ' + dateStr + '</span><span><i class="far fa-eye"></i> ' + p.views + ' 阅读</span></div>' +
             '</div></article>';
         }).join('');
 
@@ -293,17 +284,10 @@
           '</div>' +
           (post.cover_image ? '<img class="blog-detail-cover" src="' + post.cover_image + '" alt="">' : '') +
           (tags ? '<div class="blog-card-tags" style="margin-bottom:16px;">' + tags + '</div>' : '') +
-          '<div class="blog-detail-content">' + (post.content_html || '') + '</div>' +
-          '<div style="text-align:center;padding:30px 0 10px;border-top:1px solid var(--glass-border);margin-top:32px;">' +
-          '<button class="bili-blog-like-btn' + (post.liked ? ' liked' : '') + '" id="blog-like-btn" data-post="' + post.id + '">' +
-          '<i class="' + (post.liked ? 'fas' : 'far') + ' fa-heart"></i> <span id="blog-like-count">' + (post.likes || 0) + '</span> 点赞' +
-          '</button></div>' +
-          '<div id="blog-comment-wrap" style="margin-top:24px;"></div>';
+          '<div class="blog-detail-content">' + (post.content_html || '') + '</div>';
         // 侧边栏标签
         document.getElementById('post-tag-list').innerHTML = tags || '<span style="opacity:0.4;font-size:0.82rem;">暂无标签</span>';
         buildTOC();
-        // 加载评论区
-        loadBlogComments(slug);
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } catch(e) { document.getElementById('detail-content').innerHTML = '<div class="blog-loading">加载失败</div>'; }
     }
@@ -349,138 +333,6 @@
       document.getElementById('blog-toc').classList.remove('active');
       document.getElementById('sidebar-cat-card').style.display = 'block';
       document.getElementById('sidebar-tag-card').style.display = 'none';
-    }
-
-    // ── 博客点赞 ──
-    document.addEventListener('click', async (e) => {
-      const btn = e.target.closest('#blog-like-btn');
-      if (!btn) return;
-      const postId = btn.dataset.post;
-      btn.disabled = true;
-      try {
-        const res = await fetch(BLOG_API + '?action=post_like', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ post_id: parseInt(postId) })
-        });
-        const data = await res.json();
-        if (data.ok) {
-          document.getElementById('blog-like-count').textContent = data.likes;
-          if (data.action === 'liked') { btn.classList.add('liked'); btn.querySelector('i').className = 'fas fa-heart'; }
-          else { btn.classList.remove('liked'); btn.querySelector('i').className = 'far fa-heart'; }
-        }
-      } catch(e) {}
-      btn.disabled = false;
-    });
-
-    // ── 博客评论区 ──
-    async function loadBlogComments(slug) {
-      const wrap = document.getElementById('blog-comment-wrap');
-      const GUESTBOOK_API = (() => {
-        try { return new URL('../server/api/guestbook.php', window.location.href).toString(); }
-        catch(e) { return window.location.origin + '/server/api/guestbook.php'; }
-      })();
-
-      let commentPage = 1, commentTotalPages = 1;
-
-      async function load(page) {
-        commentPage = page;
-        wrap.innerHTML = '<div style="text-align:center;padding:20px;opacity:0.5;">加载评论中...</div>';
-        try {
-          const res = await fetch(GUESTBOOK_API + '?page=' + page + '&limit=10&source=blog:' + slug + '&sort=newest');
-          const data = await res.json();
-          const items = data.items || [];
-          const pg = data.pagination || {};
-          commentTotalPages = pg.totalPages || 1;
-
-          wrap.innerHTML = '<h3 style="margin-bottom:16px;font-size:1.05rem;"><i class="far fa-comment-dots"></i> 评论 (' + (pg.total || 0) + ')</h3>';
-
-          if (items.length === 0) {
-            wrap.innerHTML += '<div style="text-align:center;padding:30px;opacity:0.4;">暂无评论，来说点什么吧</div>';
-          } else {
-            items.forEach(item => wrap.appendChild(buildCommentItem(item)));
-          }
-
-          // 分页
-          if (commentTotalPages > 1) {
-            const pgDiv = document.createElement('div');
-            pgDiv.style.cssText = 'display:flex;justify-content:center;gap:6px;margin-top:16px;';
-            const btn = (label, target, disabled) => {
-              const b = document.createElement('button');
-              b.textContent = label; b.className = 'blog-page-btn' + (target === commentPage ? ' active' : '');
-              if (disabled) b.disabled = true;
-              b.addEventListener('click', () => load(target));
-              return b;
-            };
-            pgDiv.appendChild(btn('‹', commentPage - 1, commentPage <= 1));
-            for (let i = 1; i <= commentTotalPages; i++) {
-              if (commentTotalPages <= 7 || i === 1 || i === commentTotalPages || Math.abs(i - commentPage) <= 1)
-                pgDiv.appendChild(btn(String(i), i));
-              else if ((i === 2 && commentPage > 3) || (i === commentTotalPages - 1 && commentPage < commentTotalPages - 2)) {
-                const s = document.createElement('span'); s.textContent = '…'; s.style.padding = '0 4px'; pgDiv.appendChild(s);
-              }
-            }
-            pgDiv.appendChild(btn('›', commentPage + 1, commentPage >= commentTotalPages));
-            wrap.appendChild(pgDiv);
-          }
-
-          // 发布表单
-          const formDiv = document.createElement('div');
-          formDiv.style.cssText = 'margin-top:20px;padding-top:16px;border-top:1px solid var(--glass-border);';
-          formDiv.innerHTML =
-            '<textarea id="blog-comment-text" rows="2" placeholder="写下你的评论..." style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--glass-border);background:transparent;color:var(--text-color);resize:vertical;font-family:inherit;" maxlength="500"></textarea>' +
-            '<div style="display:flex;gap:8px;margin-top:8px;align-items:center;">' +
-            '<input id="blog-comment-name" type="text" placeholder="你的昵称" maxlength="40" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--glass-border);background:transparent;color:var(--text-color);" />' +
-            '<button id="blog-comment-submit" class="bili-btn-primary" style="white-space:nowrap;">发表评论</button></div>';
-          wrap.appendChild(formDiv);
-
-          document.getElementById('blog-comment-submit').addEventListener('click', async () => {
-            const msg = document.getElementById('blog-comment-text').value.trim();
-            const name = document.getElementById('blog-comment-name').value.trim() || '匿名';
-            if (!msg) return;
-            const btn = document.getElementById('blog-comment-submit');
-            btn.disabled = true;
-            try {
-              const r = await fetch(GUESTBOOK_API, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, message: msg, email: '', source: 'blog:' + slug })
-              });
-              const d = await r.json();
-              if (r.ok && d.success) {
-                document.getElementById('blog-comment-text').value = '';
-                load(1);
-              }
-            } catch(e) {}
-            btn.disabled = false;
-          });
-        } catch(e) { wrap.innerHTML = '<div style="text-align:center;padding:20px;opacity:0.4;">评论加载失败</div>'; }
-      }
-
-      // 调用 guestbook 的 buildCommentItem 风格（复用 B站 评论区 CSS）
-      // blog.html 没有 guestbook 的 CSS，内嵌一下关键样式
-      function buildCommentItem(item) {
-        const div = document.createElement('div');
-        div.style.cssText = 'padding:16px 0;border-bottom:1px solid var(--glass-border);';
-        div.innerHTML =
-          '<div style="display:flex;gap:10px;">' +
-          '<div style="width:36px;height:36px;border-radius:50%;background:' + avatarColor(item.name) + ';color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.9rem;flex-shrink:0;">' + (item.name||'匿')[0].toUpperCase() + '</div>' +
-          '<div style="flex:1;min-width:0;">' +
-          '<div style="display:flex;gap:8px;align-items:center;margin-bottom:4px;">' +
-          '<span style="font-weight:600;font-size:0.9rem;color:var(--accent-color);">' + (item.name||'匿名') + '</span>' +
-          '<span style="font-size:0.78rem;opacity:0.5;">' + relativeTime(item.createdAt) + '</span></div>' +
-          '<div style="font-size:0.92rem;line-height:1.6;white-space:pre-wrap;">' + (item.message||'') + '</div>' +
-          '</div></div>';
-        return div;
-      }
-
-      const avatarColors = ['#FB7299','#00AEEC','#F25D8E','#6DC781','#FFB347','#8B5CF6'];
-      function avatarColor(n) { let h=0; for(let i=0;i<(n||'?').length;i++)h=n.charCodeAt(i)+((h<<5)-h); return avatarColors[Math.abs(h)%avatarColors.length]; }
-      function relativeTime(iso) {
-        const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-        if (diff<60) return '刚刚'; if (diff<3600) return Math.floor(diff/60)+'分钟前';
-        if (diff<86400) return Math.floor(diff/3600)+'小时前'; if (diff<604800) return Math.floor(diff/86400)+'天前';
-        const d = new Date(iso); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-      }
-
-      load(1);
     }
 
     // ── URL 参数检测：?slug=xxx 直达文章 ──

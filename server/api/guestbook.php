@@ -1,19 +1,7 @@
 <?php
 declare(strict_types=1);
 
-set_error_handler(function ($s, $m, $f, $l) {
-    if (!(error_reporting() & $s)) return false;
-    throw new ErrorException($m, 0, $s, $f, $l);
-});
-set_exception_handler(function ($e) {
-    ob_clean();
-    http_response_code(500);
-    echo json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
-    exit;
-});
-
-ob_start();
-error_reporting(E_ALL);
+error_reporting(E_ERROR | E_PARSE);
 ini_set('display_errors', '0');
 ini_set('html_errors', '0');
 header('Content-Type: application/json; charset=utf-8');
@@ -24,7 +12,6 @@ header('Content-Type: application/json; charset=utf-8');
 
 function respond(int $code, array $payload): void
 {
-    ob_clean();
     http_response_code($code);
     echo json_encode($payload, JSON_UNESCAPED_UNICODE);
     exit;
@@ -103,18 +90,14 @@ function initializeSchema(PDO $pdo, string $tableName, string $likesTable): void
         `email` VARCHAR(100) NOT NULL DEFAULT '',
         `message` VARCHAR(500) NOT NULL,
         `likes` INT UNSIGNED NOT NULL DEFAULT 0,
-        `source` VARCHAR(100) DEFAULT NULL,
         `created_at` VARCHAR(40) NOT NULL,
         PRIMARY KEY (`id`),
         KEY `idx_root` (`root_id`),
         KEY `idx_parent` (`parent_id`),
-        KEY `idx_source` (`source`),
         KEY `idx_created` (`created_at`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 
-    try { $pdo->exec("ALTER TABLE `$tableName` ADD COLUMN `source` VARCHAR(100) DEFAULT NULL"); } catch (Throwable $e) {}
-    try { $pdo->exec("ALTER TABLE `$tableName` ADD KEY `idx_source` (`source`)"); } catch (Throwable $e) {}
-    // 兼容旧表
+    // 兼容旧表: 尝试添加新列 (忽略重复列错误)
     try { $pdo->exec("ALTER TABLE `$tableName` ADD COLUMN `root_id` BIGINT UNSIGNED DEFAULT NULL AFTER `parent_id`"); } catch (Throwable $e) {}
     try { $pdo->exec("ALTER TABLE `$tableName` ADD COLUMN `likes` INT UNSIGNED NOT NULL DEFAULT 0"); } catch (Throwable $e) {}
     try { $pdo->exec("ALTER TABLE `$tableName` ADD KEY `idx_root` (`root_id`)"); } catch (Throwable $e) {}
@@ -198,7 +181,6 @@ if ($method === 'GET') {
     $page = max(1, (int)($_GET['page'] ?? 1));
     $limit = min(50, max(5, (int)($_GET['limit'] ?? 20)));
     $sort = $_GET['sort'] ?? 'newest';
-    $source = $_GET['source'] ?? '';
 
     $orderBy = match ($sort) {
         'oldest' => 'id ASC',
@@ -206,18 +188,9 @@ if ($method === 'GET') {
         default => 'id DESC',
     };
 
-    // WHERE 条件
-    $where = "parent_id IS NULL";
-    $params = [];
-    if ($source !== '') {
-        $where .= " AND source = ?";
-        $params[] = $source;
-    }
-
     // 一级评论总数
-    $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM `$tableName` WHERE $where");
-    $cntStmt->execute($params);
-    $total = (int)$cntStmt->fetchColumn();
+    $cntStmt = $pdo->query("SELECT COUNT(*) FROM `$tableName` WHERE parent_id IS NULL");
+    $total = $cntStmt ? (int)$cntStmt->fetchColumn() : 0;
     $totalPages = max(1, (int)ceil($total / $limit));
     $offset = ($page - 1) * $limit;
 
@@ -225,7 +198,7 @@ if ($method === 'GET') {
     $stmt = $pdo->prepare(
         "SELECT id, name, email, message, likes, created_at AS createdAt
          FROM `$tableName`
-         WHERE $where
+         WHERE parent_id IS NULL
          ORDER BY $orderBy
          LIMIT :lim OFFSET :off"
     );
@@ -354,7 +327,6 @@ $name = sanitizeText($input['name'] ?? '');
 $email = sanitizeText($input['email'] ?? '');
 $message = sanitizeMessage($input['message'] ?? '');
 $parentId = isset($input['parent_id']) ? (int)$input['parent_id'] : null;
-$source = sanitizeText($input['source'] ?? '') ?: null;
 
 if ($name === '' || $message === '') {
     respond(400, ['error' => '昵称和内容不能为空']);
@@ -388,13 +360,13 @@ try {
         }
 
         $stmt = $pdo->prepare(
-            "INSERT INTO `$tableName` (parent_id, root_id, name, email, message, source, created_at) VALUES (:pid, :rid, :name, :email, :msg, :src, :ca)"
+            "INSERT INTO `$tableName` (parent_id, root_id, name, email, message, created_at) VALUES (:pid, :rid, :name, :email, :msg, :ca)"
         );
-        $stmt->execute([':pid' => $parentId, ':rid' => $rootId, ':name' => $name, ':email' => $email, ':msg' => $message, ':src' => $source, ':ca' => $createdAt]);
+        $stmt->execute([':pid' => $parentId, ':rid' => $rootId, ':name' => $name, ':email' => $email, ':msg' => $message, ':ca' => $createdAt]);
     } else {
         $pdo->prepare(
-            "INSERT INTO `$tableName` (name, email, message, source, created_at) VALUES (:name, :email, :msg, :src, :ca)"
-        )->execute([':name' => $name, ':email' => $email, ':msg' => $message, ':src' => $source, ':ca' => $createdAt]);
+            "INSERT INTO `$tableName` (name, email, message, created_at) VALUES (:name, :email, :msg, :ca)"
+        )->execute([':name' => $name, ':email' => $email, ':msg' => $message, ':ca' => $createdAt]);
         $newId = (int)$pdo->lastInsertId();
         $pdo->prepare("UPDATE `$tableName` SET root_id = ? WHERE id = ?")->execute([$newId, $newId]);
     }
