@@ -112,11 +112,11 @@
         </div>
         <div class="editor-field" style="display:flex;gap:12px;flex-wrap:wrap;">
           <div style="flex:1;min-width:160px;">
-            <label>分类</label>
+            <label>分类 <button type="button" id="btn-add-cat" class="admin-btn outline" style="font-size:0.7rem;padding:2px 8px;margin-left:6px;">+ 新建</button></label>
             <select id="ed-category"><option value="">无分类</option></select>
           </div>
           <div style="flex:2;min-width:200px;">
-            <label>标签 (Ctrl+点击多选)</label>
+            <label>标签 (Ctrl+点击多选) <button type="button" id="btn-add-tag" class="admin-btn outline" style="font-size:0.7rem;padding:2px 8px;margin-left:6px;">+ 新建</button></label>
             <select id="ed-tags" multiple style="height:100px;"></select>
           </div>
         </div>
@@ -163,7 +163,7 @@
         const data = await res.json();
         if (res.ok && data.ok) { document.getElementById('admin-login').classList.add('hidden'); document.getElementById('admin-panel').classList.add('active'); loadPostList(); loadEditorData(); }
         else toast(data.error || '密码错误', 'error');
-      } catch(e) { toast('网络错误', 'error'); }
+      } catch(e) { toast('请求失败: ' + (e.message || ''), 'error'); }
     });
 
     document.getElementById('btn-logout').addEventListener('click', () => {
@@ -225,6 +225,34 @@
       } catch(e) {}
     }
 
+    // ── 创建分类 ──
+    document.getElementById('btn-add-cat').addEventListener('click', async () => {
+      const name = prompt('输入新分类名称:');
+      if (!name || !name.trim()) return;
+      try {
+        const res = await fetch(BLOG_API + '?action=create_category', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name.trim() })
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) { toast('分类已创建'); loadEditorData(); }
+        else toast(data.error || '创建失败', 'error');
+      } catch(e) { toast('请求失败', 'error'); }
+    });
+
+    // ── 创建标签 ──
+    document.getElementById('btn-add-tag').addEventListener('click', async () => {
+      const name = prompt('输入新标签名称:');
+      if (!name || !name.trim()) return;
+      try {
+        const res = await fetch(BLOG_API + '?action=create_tag', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name.trim() })
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) { toast('标签已创建'); loadEditorData(); }
+        else toast(data.error || '创建失败', 'error');
+      } catch(e) { toast('请求失败', 'error'); }
+    });
+
     // ── 编辑/新建 ──
     document.getElementById('btn-new').addEventListener('click', () => {
       editingId = null;
@@ -242,7 +270,7 @@
 
     async function editPost(id) {
       try {
-        const res = await fetch(BLOG_API + '?action=admin_posts&page=1', { credentials: 'same-origin' });
+        const res = await fetch(BLOG_API + '?action=admin_posts&page=1');
         const data = await res.json();
         const post = (data.posts || []).find(p => p.id == id);
         if (!post) return;
@@ -283,7 +311,7 @@
     document.getElementById('btn-save').addEventListener('click', async () => {
       const title = document.getElementById('ed-title').value.trim();
       if (!title) { toast('标题不能为空', 'error'); return; }
-      const tagIds = Array.from(document.getElementById('ed-tags').selectedOptions).map(o => parseInt(o.value));
+      const tagIds = Array.from(document.getElementById('ed-tags').selectedOptions).map(o => parseInt(o.value)).filter(Boolean);
       const payload = {
         title, content_md: document.getElementById('ed-content').value,
         excerpt: document.getElementById('ed-excerpt').value.trim(),
@@ -296,16 +324,18 @@
       const action = editingId ? 'update' : 'create';
       try {
         const res = await fetch(BLOG_API + '?action=' + action, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), credentials: 'same-origin'
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
         });
-        const data = await res.json();
+        const text = await res.text();
+        let data;
+        try { data = JSON.parse(text); } catch(e) { toast('服务器返回异常: ' + text.slice(0, 100), 'error'); return; }
         if (res.ok && data.ok) {
           toast(editingId ? '更新成功' : '发布成功');
           document.getElementById('editor-wrap').classList.remove('active');
           document.getElementById('post-list-wrap').style.display = 'block';
           loadPostList(adminPage);
         } else toast(data.error || '操作失败', 'error');
-      } catch(e) { toast('网络错误', 'error'); }
+      } catch(e) { toast('请求失败: ' + (e.message || '未知'), 'error'); }
     });
 
     // ── 删除 ──
@@ -313,18 +343,18 @@
       if (!confirm('确定删除？不可恢复！')) return;
       try {
         const res = await fetch(BLOG_API + '?action=delete', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }), credentials: 'same-origin'
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id })
         });
         const data = await res.json();
         if (res.ok && data.ok) { toast('已删除'); loadPostList(adminPage); }
         else toast(data.error || '删除失败', 'error');
-      } catch(e) { toast('网络错误', 'error'); }
+      } catch(e) { toast('请求失败: ' + (e.message || ''), 'error'); }
     }
 
     // ── 检查登录 ──
     (async () => {
       try {
-        const res = await fetch(BLOG_API + '?action=admin_posts&page=1', { credentials: 'same-origin' });
+        const res = await fetch(BLOG_API + '?action=admin_posts&page=1');
         if (res.ok) { document.getElementById('admin-login').classList.add('hidden'); document.getElementById('admin-panel').classList.add('active'); loadPostList(); loadEditorData(); }
       } catch(e) {}
     })();

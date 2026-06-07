@@ -1,9 +1,13 @@
 <?php
 declare(strict_types=1);
 
-error_reporting(E_ERROR | E_PARSE);
+error_reporting(E_ALL);
 ini_set('display_errors', '0');
+ini_set('log_errors', '1');
 header('Content-Type: application/json; charset=utf-8');
+
+// 会话必须在任何输出之前启动
+session_start();
 
 require_once __DIR__ . '/../lib/Markdown.php';
 
@@ -107,9 +111,8 @@ function slugify(string $text): string
 
 function requireAuth(): void
 {
-    session_start();
     if (empty($_SESSION['blog_authed'])) {
-        respond(401, ['error' => '未授权']);
+        respond(401, ['error' => '未授权，请先登录']);
     }
 }
 
@@ -285,7 +288,6 @@ if ($action === 'login') {
     $stored = getAdminPassword();
     if ($stored === '') respond(500, ['error' => '未配置管理员密码']);
     if ($pw !== $stored) respond(403, ['error' => '密码错误']);
-    session_start();
     $_SESSION['blog_authed'] = true;
     respond(200, ['ok' => true]);
 }
