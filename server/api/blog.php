@@ -1,9 +1,12 @@
 <?php
 declare(strict_types=1);
 
-error_reporting(E_ERROR | E_PARSE);
+// 输出缓冲：杜绝任何意外的 PHP 警告/错误输出污染 JSON
+ob_start();
+
+error_reporting(E_ALL);
 ini_set('display_errors', '0');
-ini_set('log_errors', '1');
+ini_set('html_errors', '0');
 header('Content-Type: application/json; charset=utf-8');
 
 // 会话必须在任何输出之前启动
@@ -13,6 +16,7 @@ session_start();
 register_shutdown_function(function () {
     $error = error_get_last();
     if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+        ob_clean();
         http_response_code(500);
         echo json_encode(['error' => '服务器内部错误: ' . $error['message']], JSON_UNESCAPED_UNICODE);
     }
@@ -26,6 +30,7 @@ require_once __DIR__ . '/../../vendor/autoload.php';
 
 function respond(int $code, array $payload): void
 {
+    ob_clean();
     http_response_code($code);
     echo json_encode($payload, JSON_UNESCAPED_UNICODE);
     exit;
