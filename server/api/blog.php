@@ -145,7 +145,7 @@ function sanitizeStr(string $s, int $max = 500): string
 
 $pdo = connectDb();
 initTables($pdo);
-$converter = new \League\CommonMark\CommonMarkConverter([
+$converter = new \League\CommonMark\GithubFlavoredMarkdownConverter([
     'html_input' => 'strip',
     'allow_unsafe_links' => false,
 ]);
