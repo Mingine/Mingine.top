@@ -1,13 +1,22 @@
 <?php
 declare(strict_types=1);
 
-error_reporting(E_ALL);
+error_reporting(E_ERROR | E_PARSE);
 ini_set('display_errors', '0');
 ini_set('log_errors', '1');
 header('Content-Type: application/json; charset=utf-8');
 
 // 会话必须在任何输出之前启动
 session_start();
+
+// 兜底捕获所有致命错误
+register_shutdown_function(function () {
+    $error = error_get_last();
+    if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+        http_response_code(500);
+        echo json_encode(['error' => '服务器内部错误: ' . $error['message']], JSON_UNESCAPED_UNICODE);
+    }
+});
 
 require_once __DIR__ . '/../lib/Markdown.php';
 
@@ -123,7 +132,11 @@ function getAdminPassword(): string
 
 function sanitizeStr(string $s, int $max = 500): string
 {
-    return mb_substr(trim(strip_tags($s)), 0, $max);
+    $s = trim(strip_tags($s));
+    if (function_exists('mb_substr')) {
+        return mb_substr($s, 0, $max);
+    }
+    return substr($s, 0, $max);
 }
 
 // ============================================================
@@ -305,7 +318,7 @@ if ($action === 'create') {
     $tagIds = isset($input['tag_ids']) && is_array($input['tag_ids']) ? $input['tag_ids'] : [];
 
     if ($title === '') respond(400, ['error' => '标题不能为空']);
-    if ($excerpt === '') $excerpt = mb_substr(strip_tags($contentMd), 0, 200);
+    if ($excerpt === '') $excerpt = function_exists('mb_substr') ? mb_substr(strip_tags($contentMd), 0, 200) : substr(strip_tags($contentMd), 0, 200);
 
     $slug = slugify($title);
     // 确保唯一
@@ -345,7 +358,7 @@ if ($action === 'update') {
     $tagIds = isset($input['tag_ids']) && is_array($input['tag_ids']) ? $input['tag_ids'] : [];
 
     if ($title === '') respond(400, ['error' => '标题不能为空']);
-    if ($excerpt === '') $excerpt = mb_substr(strip_tags($contentMd), 0, 200);
+    if ($excerpt === '') $excerpt = function_exists('mb_substr') ? mb_substr(strip_tags($contentMd), 0, 200) : substr(strip_tags($contentMd), 0, 200);
 
     $contentHtml = $markdown->parse($contentMd);
     $now = gmdate('c');
