@@ -25,6 +25,7 @@
 | 🤖 **AI 聊天机器人** | 悬浮窗 DeepSeek AI 助手，与访客实时对话 |
 | 🎮 **游戏中心** | 内置 2048 等小游戏，以及 Unity WebGL 游戏 |
 | 🎵 **音乐播放器** | 网易云 + Spotify 双源切换，悬浮播放 |
+| � **博客系统** | Markdown 写作，分类/标签，文章目录，自动部署 |
 | 💬 **B站风格评论区** | 仿 Bilibili 评论区：一级评论 + 楼中楼回复 + 点赞 + 分页 |
 | ☁️ **私有云盘** | 密码保护的文件上传/下载/管理，仅自己可访问 |
 | 🌓 **明暗主题** | Glassmorphism 毛玻璃风格，自动跟随系统偏好 |
@@ -37,9 +38,10 @@
 | 层级 | 技术 |
 |:--|:--|
 | **前端** | HTML5 · CSS3 (Glassmorphism) · Vanilla JavaScript |
-| **后端** | PHP 8 · PDO |
+| **后端** | PHP 8 · PDO · league/commonmark (GFM) |
 | **数据库** | MySQL 8 · utf8mb4 |
 | **AI** | DeepSeek API |
+| **图表** | Chart.js |
 | **部署** | 阿里云 ECS · 宝塔面板 · Nginx |
 | **CDN** | Cloudflare |
 | **图标** | Font Awesome 6 |
@@ -56,6 +58,9 @@ Mingine.top/
 │   ├── drive.html                 # 私有云盘
 │   ├── game.html                  # 游戏中心
 │   ├── game2048.html              # 2048 游戏
+│   ├── blog.html                  # 博客前台（列表 + 详情 + 目录）
+│   ├── blog-admin.html            # 博客管理后台（Markdown 编辑）
+│   ├── dashboard.html             # 管理仪表盘（PV/UV/在线/访客）
 │   └── portfolio.html             # 作品集
 ├── assets/
 │   ├── css/
@@ -67,6 +72,10 @@ Mingine.top/
 │   │   ├── drive.js               # 云盘交互
 │   │   ├── game2048.js            # 2048 游戏逻辑
 │   │   └── music-player.js        # 音乐播放器
+├── content/                       # 🆕 博客媒体资源
+│   ├── images/
+│   │   ├── YYYY/MM/               # 按年月归档
+│   │   └── common/                # 通用图片
 │   ├── images/                    # 图片资源
 │   └── videos/                    # 视频资源
 ├── H5Game/                        # Unity WebGL 游戏
@@ -77,8 +86,12 @@ Mingine.top/
 │   │   ├── guestbook.config.php   # 数据库配置
 │   │   └── drive.php              # 云盘 API (上传/下载/管理)
 │   ├── storage/                   # 云盘文件存储 (Web 不可访问)
+│   ├── lib/
+│   │   └── Markdown.php           # Markdown 解析库（已弃用，改用 league/commonmark）
 │   ├── sql/
-│   │   └── guestbook.sql          # 数据库建表脚本
+│   │   ├── analytics.sql          # 仪表盘统计表
+│   │   ├── blog.sql               # 博客系统表
+│   │   └── guestbook.sql          # 评论区表
 │   ├── config/                    # 配置文件
 │   └── data/
 │       └── guestbook.json         # 数据文件
@@ -105,7 +118,14 @@ cd /www/wwwroot
 git clone https://github.com/Mingine/Mingine.top.git
 ```
 
-2. **配置数据库**
+2. **安装 Composer 依赖**
+
+```bash
+cd /www/wwwroot/mingine.top
+composer install --no-dev
+```
+
+3. **配置数据库**
 
 在宝塔面板中创建 MySQL 数据库，编辑 `server/api/guestbook.config.php`：
 
@@ -175,6 +195,20 @@ env[DRIVE_PASSWORD]   = "你的云盘密码"
 | 方法 | 说明 |
 |:--|:--|
 | `POST` | `{message}` → 返回 AI 回复 |
+
+### 博客 API (`server/api/blog.php`)
+
+| 方法 | 参数 | 说明 |
+|:--|:--|:--|
+| `GET` | `?action=posts&page=1&category=slug` | 分页获取文章列表 |
+| `GET` | `?action=post&slug=xxx` | 单篇文章详情 |
+| `GET` | `?action=categories` | 获取分类列表 |
+| `POST` | `?action=login` + `{password}` | 管理员登录 |
+| `POST` | `?action=create` + `{title,content_md,tags,...}` | 创建文章 |
+| `POST` | `?action=update` + `{id,...}` | 更新文章 |
+| `POST` | `?action=delete` + `{id}` | 删除文章 |
+| `POST` | `?action=create_category` + `{name}` | 创建分类 |
+| `POST` | `?action=delete_category` + `{id}` | 删除分类 |
 
 ---
 
