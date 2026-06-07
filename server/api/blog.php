@@ -198,7 +198,8 @@ if ($method === 'GET') {
                 WHERE $where
                 ORDER BY p.created_at DESC
                 LIMIT $limit OFFSET $offset";
-        $stmt = $pdo->query($sql);
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
         $posts = $stmt->fetchAll();
 
         // 加载标签
