@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>博客管理 - Mingine 的小站</title>
+  <link rel="icon" type="image/jpeg" href="../assets/images/image00.png">
+  <link rel="stylesheet" href="../assets/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    .admin-page { min-height: 100vh; background: var(--bg-color); }
+    .admin-container { max-width: 1000px; margin: calc(var(--nav-height) + 30px) auto 40px auto; padding: 0 20px; }
+
+    .admin-login { max-width: 400px; margin: 100px auto; padding: 36px; text-align: center; }
+    .admin-login input { width: 100%; padding: 10px 14px; border: 1px solid var(--glass-border); border-radius: 8px; background: transparent; color: var(--text-color); margin-bottom: 12px; font-size: 1rem; }
+    .admin-btn { padding: 10px 22px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.9rem; }
+    .admin-btn.primary { background: var(--accent-color); color: #fff; }
+    .admin-btn.danger { background: #ef4444; color: #fff; }
+    .admin-btn.outline { background: transparent; border: 1px solid var(--glass-border); color: var(--text-color); }
+    .admin-panel { display: none; }
+    .admin-panel.active { display: block; }
+    .admin-login.hidden { display: none; }
+
+    .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+    .admin-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    .admin-table th,.admin-table td { padding: 10px 12px; border-bottom: 1px solid var(--glass-border); text-align: left; }
+    .admin-table th { font-weight: 600; opacity: 0.7; font-size: 0.82rem; }
+    .admin-status { font-size: 0.78rem; padding: 3px 8px; border-radius: 999px; }
+    .admin-status.pub { background: rgba(109,199,129,0.2); color: #6DC781; }
+    .admin-status.draft { background: rgba(255,179,71,0.2); color: #FFB347; }
+    .admin-actions { display: flex; gap: 6px; }
+
+    /* 编辑器 */
+    .editor-wrap { display: none; }
+    .editor-wrap.active { display: block; }
+    .editor-field { margin-bottom: 16px; }
+    .editor-field label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px; opacity: 0.8; }
+    .editor-field input, .editor-field textarea, .editor-field select {
+      width: 100%; padding: 10px 12px; border: 1px solid var(--glass-border); border-radius: 8px;
+      background: transparent; color: var(--text-color); font-size: 0.9rem; font-family: inherit; outline: none;
+    }
+    .editor-field textarea { resize: vertical; min-height: 300px; font-family: 'Consolas','Monaco',monospace; font-size: 0.88rem; line-height: 1.6; }
+    .editor-field textarea:focus, .editor-field input:focus, .editor-field select:focus { border-color: var(--accent-color); }
+    .editor-actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+    .editor-preview { padding: 16px; border: 1px solid var(--glass-border); border-radius: 8px; margin-top: 10px; min-height: 100px; line-height: 1.7; }
+    .editor-preview h3 { margin-bottom: 8px; }
+
+    .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); padding: 10px 22px; border-radius: 10px; color: #fff; font-size: 0.9rem; z-index: 9999; animation: toastIn 0.3s; }
+    .toast.success { background: rgba(16,185,129,0.92); }
+    .toast.error { background: rgba(239,68,68,0.92); }
+    .toast.fadeout { animation: toastOut 0.35s forwards; }
+    @keyframes toastIn { from{opacity:0;transform:translateX(-50%) translateY(-10px);} to{opacity:1;transform:translateX(-50%) translateY(0);} }
+    @keyframes toastOut { from{opacity:1;transform:translateX(-50%) translateY(0);} to{opacity:0;transform:translateX(-50%) translateY(-10px);} }
+  </style>
+</head>
+<body class="admin-page">
+  <nav class="navbar glass">
+    <a href="../index.html" class="nav-brand">Mingine</a>
+    <div class="nav-links">
+      <a href="../index.html">首页</a>
+      <a href="blog.html">博客</a>
+      <a href="dashboard.html">仪表盘</a>
+      <a href="contact.html">联系我</a>
+      <button class="theme-toggle" id="theme-btn" aria-label="切换主题"><i class="fas fa-moon"></i></button>
+    </div>
+  </nav>
+
+  <div class="admin-container">
+    <!-- 登录 -->
+    <div class="admin-login glass" id="admin-login">
+      <h2><i class="fas fa-lock"></i> 博客管理</h2>
+      <p style="opacity:0.6;margin:8px 0 18px;">请输入管理员密码</p>
+      <input type="password" id="login-pw" placeholder="密码" />
+      <button class="admin-btn primary" id="login-btn" style="width:100%;">登录</button>
+    </div>
+
+    <!-- 主面板 -->
+    <div class="admin-panel" id="admin-panel">
+      <div class="admin-header">
+        <h2><i class="fas fa-edit"></i> 文章管理</h2>
+        <div style="display:flex;gap:8px;">
+          <button class="admin-btn primary" id="btn-new">+ 新建文章</button>
+          <button class="admin-btn outline" id="btn-logout">退出</button>
+        </div>
+      </div>
+
+      <!-- 文章列表 -->
+      <div id="post-list-wrap">
+        <div style="overflow-x:auto;">
+          <table class="admin-table">
+            <thead><tr><th>标题</th><th>分类</th><th>状态</th><th>日期</th><th>操作</th></tr></thead>
+            <tbody id="post-tbody"><tr><td colspan="5" style="text-align:center;opacity:0.5;">加载中...</td></tr></tbody>
+          </table>
+        </div>
+        <div id="admin-pagination" style="display:flex;justify-content:center;gap:6px;margin-top:16px;"></div>
+      </div>
+
+      <!-- 编辑器 -->
+      <div class="editor-wrap" id="editor-wrap">
+        <h3 id="editor-title-label">新建文章</h3>
+        <div class="editor-field">
+          <label>标题 *</label>
+          <input type="text" id="ed-title" maxlength="200" />
+        </div>
+        <div class="editor-field">
+          <label>Markdown 内容 (支持 #标题 **加粗** *斜体* [链接](url) ```代码```)</label>
+          <textarea id="ed-content" placeholder="写点什么..."></textarea>
+        </div>
+        <div class="editor-field">
+          <label>摘要 (留空自动生成)</label>
+          <input type="text" id="ed-excerpt" maxlength="500" />
+        </div>
+        <div class="editor-field" style="display:flex;gap:12px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:160px;">
+            <label>分类</label>
+            <select id="ed-category"><option value="">无分类</option></select>
+          </div>
+          <div style="flex:2;min-width:200px;">
+            <label>标签 (Ctrl+点击多选)</label>
+            <select id="ed-tags" multiple style="height:100px;"></select>
+          </div>
+        </div>
+        <div class="editor-field">
+          <label>封面图 URL</label>
+          <input type="text" id="ed-cover" maxlength="500" placeholder="https://..." />
+        </div>
+        <div class="editor-field">
+          <label><input type="checkbox" id="ed-published" checked /> 发布</label>
+        </div>
+        <div class="editor-actions">
+          <button class="admin-btn primary" id="btn-save">保存</button>
+          <button class="admin-btn outline" id="btn-cancel">取消</button>
+          <button class="admin-btn outline" id="btn-preview-md">预览 Markdown</button>
+        </div>
+        <div class="editor-preview glass" id="editor-preview" style="display:none;"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="../assets/js/main.js"></script>
+  <script>
+    const BLOG_API = (() => {
+      try { return new URL('../server/api/blog.php', window.location.href).toString(); }
+      catch(e) { return window.location.origin + '/server/api/blog.php'; }
+    })();
+
+    let editingId = null, adminPage = 1, adminTotalPages = 1;
+
+    function toast(msg, type = 'success') {
+      const old = document.querySelector('.toast'); if (old) old.remove();
+      const t = document.createElement('div'); t.className = 'toast ' + type; t.textContent = msg;
+      document.body.appendChild(t);
+      setTimeout(() => { t.classList.add('fadeout'); setTimeout(() => t.remove(), 400); }, 2500);
+    }
+
+    // ── 登录 ──
+    document.getElementById('login-btn').addEventListener('click', async () => {
+      const pw = document.getElementById('login-pw').value;
+      try {
+        const res = await fetch(BLOG_API + '?action=login', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pw })
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) { document.getElementById('admin-login').classList.add('hidden'); document.getElementById('admin-panel').classList.add('active'); loadPostList(); loadEditorData(); }
+        else toast(data.error || '密码错误', 'error');
+      } catch(e) { toast('网络错误', 'error'); }
+    });
+
+    document.getElementById('btn-logout').addEventListener('click', () => {
+      document.getElementById('admin-login').classList.remove('hidden');
+      document.getElementById('admin-panel').classList.remove('active');
+      document.getElementById('login-pw').value = '';
+    });
+
+    // ── 文章列表 ──
+    async function loadPostList(page = 1) {
+      adminPage = page;
+      const tbody = document.getElementById('post-tbody');
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;opacity:0.5;">加载中...</td></tr>';
+      try {
+        const res = await fetch(BLOG_API + '?action=admin_posts&page=' + page, { credentials: 'same-origin' });
+        const data = await res.json();
+        if (!res.ok) { document.getElementById('admin-login').classList.remove('hidden'); document.getElementById('admin-panel').classList.remove('active'); return; }
+        const posts = data.posts || [];
+        adminTotalPages = data.totalPages || 1;
+        if (posts.length === 0) { tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;opacity:0.5;">暂无文章</td></tr>'; return; }
+        tbody.innerHTML = posts.map(p => {
+          const date = new Date(p.created_at);
+          const ds = isNaN(date.getTime()) ? '' : date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0');
+          return '<tr><td><strong>' + p.title + '</strong></td><td>' + (p.category_name || '-') + '</td><td><span class="admin-status ' + (p.is_published == 1 ? 'pub' : 'draft') + '">' + (p.is_published == 1 ? '已发布' : '草稿') + '</span></td><td>' + ds + '</td><td class="admin-actions"><button class="admin-btn outline" data-edit="' + p.id + '" style="font-size:0.8rem;padding:4px 10px;">编辑</button><button class="admin-btn danger" data-del="' + p.id + '" style="font-size:0.8rem;padding:4px 10px;">删除</button></td></tr>';
+        }).join('');
+        tbody.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => editPost(parseInt(b.dataset.edit))));
+        tbody.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => deletePost(parseInt(b.dataset.del))));
+        buildAdminPagination();
+      } catch(e) { /* ignore */ }
+    }
+
+    function buildAdminPagination() {
+      const pg = document.getElementById('admin-pagination'); pg.innerHTML = '';
+      if (adminTotalPages <= 1) return;
+      const btn = (label, target, disabled) => {
+        const b = document.createElement('button');
+        b.textContent = label; b.className = 'blog-page-btn' + (target === adminPage ? ' active' : ''); if (disabled) b.disabled = true;
+        b.addEventListener('click', () => loadPostList(target)); return b;
+      };
+      pg.appendChild(btn('‹', adminPage - 1, adminPage <= 1));
+      for (let i = 1; i <= adminTotalPages; i++) {
+        if (adminTotalPages <= 7 || i === 1 || i === adminTotalPages || Math.abs(i - adminPage) <= 1) pg.appendChild(btn(String(i), i));
+        else if ((i === 2 && adminPage > 3) || (i === adminTotalPages - 1 && adminPage < adminTotalPages - 2)) { const s = document.createElement('span'); s.textContent = '…'; s.style.padding = '0 4px'; pg.appendChild(s); }
+      }
+      pg.appendChild(btn('›', adminPage + 1, adminPage >= adminTotalPages));
+    }
+
+    // ── 加载分类/标签选项 ──
+    async function loadEditorData() {
+      try {
+        const [cRes, tRes] = await Promise.all([
+          fetch(BLOG_API + '?action=categories'), fetch(BLOG_API + '?action=tags')
+        ]);
+        const cats = await cRes.json(); const tags = await tRes.json();
+        const catSel = document.getElementById('ed-category');
+        catSel.innerHTML = '<option value="">无分类</option>' + (cats.categories || []).map(c => '<option value="' + c.id + '">' + c.name + '</option>').join('');
+        const tagSel = document.getElementById('ed-tags');
+        tagSel.innerHTML = (tags.tags || []).map(t => '<option value="' + t.id + '">' + t.name + '</option>').join('');
+      } catch(e) {}
+    }
+
+    // ── 编辑/新建 ──
+    document.getElementById('btn-new').addEventListener('click', () => {
+      editingId = null;
+      document.getElementById('editor-title-label').textContent = '新建文章';
+      document.getElementById('ed-title').value = '';
+      document.getElementById('ed-content').value = '';
+      document.getElementById('ed-excerpt').value = '';
+      document.getElementById('ed-cover').value = '';
+      document.getElementById('ed-published').checked = true;
+      document.getElementById('ed-category').value = '';
+      document.getElementById('ed-tags').selectedIndex = -1;
+      document.getElementById('editor-wrap').classList.add('active');
+      document.getElementById('post-list-wrap').style.display = 'none';
+    });
+
+    async function editPost(id) {
+      try {
+        const res = await fetch(BLOG_API + '?action=admin_posts&page=1', { credentials: 'same-origin' });
+        const data = await res.json();
+        const post = (data.posts || []).find(p => p.id == id);
+        if (!post) return;
+        editingId = id;
+        document.getElementById('editor-title-label').textContent = '编辑文章';
+        document.getElementById('ed-title').value = post.title || '';
+        document.getElementById('ed-content').value = post.content_md || '';
+        document.getElementById('ed-excerpt').value = post.excerpt || '';
+        document.getElementById('ed-cover').value = post.cover_image || '';
+        document.getElementById('ed-published').checked = post.is_published == 1;
+        document.getElementById('ed-category').value = post.category_id || '';
+        // 加载文章标签
+        const tagsRes = await fetch(BLOG_API + '?action=post&slug=' + post.slug);
+        const postData = await tagsRes.json();
+        const tagSel = document.getElementById('ed-tags');
+        const postTagIds = (postData.post && postData.post.tags || []).map(t => t.id || 0);
+        Array.from(tagSel.options).forEach(o => o.selected = postTagIds.includes(parseInt(o.value)));
+        document.getElementById('editor-wrap').classList.add('active');
+        document.getElementById('post-list-wrap').style.display = 'none';
+      } catch(e) {}
+    }
+
+    document.getElementById('btn-cancel').addEventListener('click', () => {
+      document.getElementById('editor-wrap').classList.remove('active');
+      document.getElementById('post-list-wrap').style.display = 'block';
+    });
+
+    // ── 预览 ──
+    document.getElementById('btn-preview-md').addEventListener('click', () => {
+      const preview = document.getElementById('editor-preview');
+      if (preview.style.display === 'none') {
+        preview.style.display = 'block';
+        preview.innerHTML = '<h3>预览</h3>' + (document.getElementById('ed-content').value || '<p style="opacity:0.5;">无内容</p>');
+      } else { preview.style.display = 'none'; }
+    });
+
+    // ── 保存 ──
+    document.getElementById('btn-save').addEventListener('click', async () => {
+      const title = document.getElementById('ed-title').value.trim();
+      if (!title) { toast('标题不能为空', 'error'); return; }
+      const tagIds = Array.from(document.getElementById('ed-tags').selectedOptions).map(o => parseInt(o.value));
+      const payload = {
+        title, content_md: document.getElementById('ed-content').value,
+        excerpt: document.getElementById('ed-excerpt').value.trim(),
+        category_id: document.getElementById('ed-category').value || null,
+        cover_image: document.getElementById('ed-cover').value.trim(),
+        is_published: document.getElementById('ed-published').checked ? 1 : 0,
+        tag_ids: tagIds
+      };
+      if (editingId) payload.id = editingId;
+      const action = editingId ? 'update' : 'create';
+      try {
+        const res = await fetch(BLOG_API + '?action=' + action, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload), credentials: 'same-origin'
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          toast(editingId ? '更新成功' : '发布成功');
+          document.getElementById('editor-wrap').classList.remove('active');
+          document.getElementById('post-list-wrap').style.display = 'block';
+          loadPostList(adminPage);
+        } else toast(data.error || '操作失败', 'error');
+      } catch(e) { toast('网络错误', 'error'); }
+    });
+
+    // ── 删除 ──
+    async function deletePost(id) {
+      if (!confirm('确定删除？不可恢复！')) return;
+      try {
+        const res = await fetch(BLOG_API + '?action=delete', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }), credentials: 'same-origin'
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) { toast('已删除'); loadPostList(adminPage); }
+        else toast(data.error || '删除失败', 'error');
+      } catch(e) { toast('网络错误', 'error'); }
+    }
+
+    // ── 检查登录 ──
+    (async () => {
+      try {
+        const res = await fetch(BLOG_API + '?action=admin_posts&page=1', { credentials: 'same-origin' });
+        if (res.ok) { document.getElementById('admin-login').classList.add('hidden'); document.getElementById('admin-panel').classList.add('active'); loadPostList(); loadEditorData(); }
+      } catch(e) {}
+    })();
+  </script>
+</body>
+</html>
