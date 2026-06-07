@@ -1,26 +1,25 @@
 <?php
 declare(strict_types=1);
 
-// 输出缓冲：杜绝任何意外的 PHP 警告/错误输出污染 JSON
-ob_start();
+// 自定义错误处理：将所有错误转为 JSON，杜绝 HTML 污染
+set_error_handler(function ($severity, $message, $file, $line) {
+    if (!(error_reporting() & $severity)) return false;
+    throw new ErrorException($message, 0, $severity, $file, $line);
+});
+set_exception_handler(function ($e) {
+    ob_clean();
+    http_response_code(500);
+    echo json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    exit;
+});
 
+ob_start();
 error_reporting(E_ALL);
 ini_set('display_errors', '0');
 ini_set('html_errors', '0');
 header('Content-Type: application/json; charset=utf-8');
 
-// 会话必须在任何输出之前启动
 session_start();
-
-// 兜底捕获所有致命错误
-register_shutdown_function(function () {
-    $error = error_get_last();
-    if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
-        ob_clean();
-        http_response_code(500);
-        echo json_encode(['error' => '服务器内部错误: ' . $error['message']], JSON_UNESCAPED_UNICODE);
-    }
-});
 
 require_once __DIR__ . '/../../vendor/autoload.php';
 
@@ -157,6 +156,8 @@ $converter = new \League\CommonMark\GithubFlavoredMarkdownConverter([
     'html_input' => 'strip',
     'allow_unsafe_links' => false,
 ]);
+
+try {
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $action = $_GET['action'] ?? '';
@@ -420,3 +421,7 @@ if ($action === 'delete_category') {
 }
 
 respond(400, ['error' => '未知操作']);
+
+} catch (Throwable $e) {
+    respond(500, ['error' => $e->getMessage()]);
+}

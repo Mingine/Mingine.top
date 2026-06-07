@@ -1,6 +1,17 @@
 <?php
 declare(strict_types=1);
 
+set_error_handler(function ($s, $m, $f, $l) {
+    if (!(error_reporting() & $s)) return false;
+    throw new ErrorException($m, 0, $s, $f, $l);
+});
+set_exception_handler(function ($e) {
+    ob_clean();
+    http_response_code(500);
+    echo json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    exit;
+});
+
 ob_start();
 error_reporting(E_ALL);
 ini_set('display_errors', '0');
