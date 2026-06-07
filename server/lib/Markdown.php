@@ -9,9 +9,7 @@ class Markdown
 {
     public function parse(string $text): string
     {
-        $text = $this->escapeHtml($text);
-        $text = $this->parseBlocks($text);
-        return $text;
+        return $this->escapeHtml($text);
     }
 
     private function escapeHtml(string $text): string
