@@ -95,6 +95,26 @@
         <div id="admin-pagination" style="display:flex;justify-content:center;gap:6px;margin-top:16px;"></div>
       </div>
 
+      <!-- 媒体上传 -->
+      <div class="media-section glass" style="margin:20px 0;padding:18px;">
+        <h3 style="margin-bottom:12px;cursor:pointer;" id="media-toggle">
+          <i class="fas fa-images"></i> 媒体库 <span style="font-size:0.8rem;opacity:0.5;">（点击展开）</span>
+        </h3>
+        <div id="media-wrap" style="display:none;">
+          <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+            <select id="media-dir" style="padding:6px 10px;border:1px solid var(--glass-border);border-radius:6px;background:transparent;color:var(--text-color);font-size:0.85rem;"></select>
+            <button class="admin-btn outline" id="btn-refresh-dirs" style="font-size:0.82rem;padding:6px 12px;"><i class="fas fa-sync-alt"></i> 刷新</button>
+          </div>
+          <div id="media-drop" style="border:2px dashed var(--glass-border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:all 0.2s;">
+            <i class="fas fa-cloud-upload-alt" style="font-size:1.8rem;opacity:0.5;"></i>
+            <p style="margin:6px 0;opacity:0.7;">拖放图片或点击上传</p>
+            <p style="font-size:0.78rem;opacity:0.4;">支持 JPG/PNG/GIF/WebP，最大 10MB</p>
+            <input type="file" id="media-file" accept="image/*" style="display:none;" />
+          </div>
+          <div id="media-result" style="margin-top:10px;"></div>
+        </div>
+      </div>
+
       <!-- 编辑器 -->
       <div class="editor-wrap" id="editor-wrap">
         <h3 id="editor-title-label">新建文章</h3>
@@ -354,6 +374,65 @@
         if (res.ok) { document.getElementById('admin-login').classList.add('hidden'); document.getElementById('admin-panel').classList.add('active'); loadPostList(); loadEditorData(); }
       } catch(e) {}
     })();
+
+    // ── 媒体库 ──
+    document.getElementById('media-toggle').addEventListener('click', () => {
+      const wrap = document.getElementById('media-wrap');
+      const isHidden = wrap.style.display === 'none';
+      wrap.style.display = isHidden ? 'block' : 'none';
+      if (isHidden) loadMediaDirs();
+    });
+
+    async function loadMediaDirs() {
+      try {
+        const res = await fetch(BLOG_API + '?action=list_dirs', { credentials: 'same-origin' });
+        const data = await res.json();
+        const sel = document.getElementById('media-dir');
+        sel.innerHTML = (data.dirs || []).map(d => '<option value="' + d + '">' + (d || '(根目录)') + '</option>').join('');
+      } catch(e) {}
+    }
+    document.getElementById('btn-refresh-dirs').addEventListener('click', loadMediaDirs);
+
+    const mediaDrop = document.getElementById('media-drop');
+    const mediaFile = document.getElementById('media-file');
+    mediaDrop.addEventListener('click', () => mediaFile.click());
+    mediaDrop.addEventListener('dragover', e => { e.preventDefault(); mediaDrop.style.borderColor = 'var(--accent-color)'; });
+    mediaDrop.addEventListener('dragleave', () => { mediaDrop.style.borderColor = ''; });
+    mediaDrop.addEventListener('drop', e => {
+      e.preventDefault();
+      mediaDrop.style.borderColor = '';
+      if (e.dataTransfer.files.length > 0) uploadMedia(e.dataTransfer.files[0]);
+    });
+    mediaFile.addEventListener('change', () => {
+      if (mediaFile.files.length > 0) uploadMedia(mediaFile.files[0]);
+      mediaFile.value = '';
+    });
+
+    async function uploadMedia(file) {
+      if (!file.type.startsWith('image/')) { toast('仅支持图片格式', 'error'); return; }
+      if (file.size > 10485760) { toast('图片不能超过 10MB', 'error'); return; }
+      const subdir = document.getElementById('media-dir').value;
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('subdir', subdir);
+      const resultEl = document.getElementById('media-result');
+      resultEl.innerHTML = '<p style="opacity:0.6;">上传中...</p>';
+      try {
+        const res = await fetch(BLOG_API + '?action=upload_image', {
+          method: 'POST', body: formData, credentials: 'same-origin'
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          const md = '![](' + data.url + ')';
+          resultEl.innerHTML =
+            '<div style="display:flex;align-items:center;gap:12px;padding:10px;background:rgba(16,185,129,0.08);border-radius:8px;">' +
+            '<span style="color:#10b981;">✅ 上传成功</span>' +
+            '<code style="flex:1;padding:6px 10px;background:var(--glass-border);border-radius:6px;font-size:0.82rem;word-break:break-all;">' + md + '</code>' +
+            '<button class="admin-btn outline" style="font-size:0.78rem;padding:4px 10px;white-space:nowrap;" onclick="navigator.clipboard.writeText(\'' + md + '\');this.textContent=\'已复制!\';setTimeout(()=>this.textContent=\'复制\',1500)">复制</button>' +
+            '</div>';
+        } else toast(data.error || '上传失败', 'error');
+      } catch(e) { resultEl.innerHTML = '<p style="color:#ef4444;">上传失败</p>'; }
+    }
   </script>
 </body>
 </html>

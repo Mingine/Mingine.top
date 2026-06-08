@@ -334,9 +334,28 @@ if ($method === 'GET') {
         respond(200, ['items' => $items, 'total' => $total]);
     }
 
+    // ── content 目录列表 ──
+    if ($action === 'list_dirs') {
+        requireAuth();
+        $baseDir = __DIR__ . '/../../content/';
+        $dirs = [''];
+        if (is_dir($baseDir)) {
+            $it = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($baseDir, RecursiveDirectoryIterator::SKIP_DOTS),
+                RecursiveIteratorIterator::SELF_FIRST
+            );
+            foreach ($it as $item) {
+                if ($item->isDir()) {
+                    $dirs[] = str_replace('\\', '/', substr($item->getPathname(), strlen($baseDir)));
+                }
+            }
+            sort($dirs);
+        }
+        respond(200, ['dirs' => $dirs]);
+    }
+
     // ── 管理后台：文章列表（含未发布） ──
     if ($action === 'admin_posts') {
-        requireAuth();
         requireAuth();
         $page = max(1, (int)($_GET['page'] ?? 1));
         $limit = 20;
@@ -449,7 +468,54 @@ if ($action === 'like_comment') {
 
 requireAuth();
 
-// ── 创建文章 ──
+// ── 上传图片到 content 目录 ──
+if ($action === 'upload_image') {
+    if (empty($_FILES['file'])) respond(400, ['error' => '未收到文件']);
+    $file = $_FILES['file'];
+    if ($file['error'] !== UPLOAD_ERR_OK) respond(400, ['error' => '上传失败']);
+    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    if (!in_array($ext, ['jpg','jpeg','png','gif','webp','svg','bmp'])) {
+        respond(400, ['error' => '仅支持图片格式']);
+    }
+    if ($file['size'] > 10 * 1024 * 1024) respond(400, ['error' => '图片不能超过 10MB']);
+
+    $subdir = trim($input['subdir'] ?? $_POST['subdir'] ?? '', '/');
+    $subdir = preg_replace('/\.\.\/|\.\.\\\\/', '', $subdir); // 防目录穿越
+    $baseDir = __DIR__ . '/../../content/';
+    $targetDir = $baseDir . ($subdir ? $subdir . '/' : '');
+    if (!is_dir($targetDir)) mkdir($targetDir, 0755, true);
+
+    $safeName = preg_replace('/[^a-zA-Z0-9._-]/', '_', $file['name']);
+    $destPath = $targetDir . $safeName;
+    if (file_exists($destPath)) $destPath = $targetDir . time() . '_' . $safeName;
+
+    if (!move_uploaded_file($file['tmp_name'], $destPath)) {
+        respond(500, ['error' => '保存失败']);
+    }
+    $url = '/content/' . ($subdir ? $subdir . '/' : '') . basename($destPath);
+    respond(200, ['ok' => true, 'url' => $url]);
+}
+
+// ── 获取 content 目录结构 ──
+if ($action === 'list_dirs') {
+    $baseDir = __DIR__ . '/../../content/';
+    $dirs = [];
+    $it = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($baseDir, RecursiveDirectoryIterator::SKIP_DOTS),
+        RecursiveIteratorIterator::SELF_FIRST
+    );
+    foreach ($it as $item) {
+        if ($item->isDir()) {
+            $rel = str_replace('\\', '/', substr($item->getPathname(), strlen($baseDir)));
+            $dirs[] = $rel;
+        }
+    }
+    sort($dirs);
+    array_unshift($dirs, ''); // 根目录
+    respond(200, ['dirs' => $dirs]);
+}
+
+// ── 列出目录中的文件 ──
 if ($action === 'create') {
     $title = sanitizeStr($input['title'] ?? '', 200);
     $contentMd = $input['content_md'] ?? '';
