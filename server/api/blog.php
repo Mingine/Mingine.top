@@ -323,7 +323,9 @@ if ($method === 'GET') {
         );
 
         foreach ($items as &$item) {
-            $item['liked'] = (bool)$pdo->prepare("SELECT id FROM blog_comment_likes WHERE comment_id = ? AND ip_hash = ?")->execute([(int)$item['id'], $vh])->fetch();
+            $lc = $pdo->prepare("SELECT id FROM blog_comment_likes WHERE comment_id = ? AND ip_hash = ?");
+            $lc->execute([(int)$item['id'], $vh]);
+            $item['liked'] = (bool)$lc->fetch();
             $replyStmt->execute([(int)$item['id']]);
             $item['replies'] = $replyStmt->fetchAll();
         }
