@@ -112,6 +112,28 @@ function initTables(PDO $pdo): void
         created_at VARCHAR(40) NOT NULL,
         UNIQUE KEY uk_like (post_id, ip_hash)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    // 博客评论表（独立于留言板）
+    $pdo->exec("CREATE TABLE IF NOT EXISTS blog_comments (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        post_id INT UNSIGNED NOT NULL,
+        parent_id BIGINT UNSIGNED DEFAULT NULL,
+        root_id BIGINT UNSIGNED DEFAULT NULL,
+        name VARCHAR(40) NOT NULL,
+        email VARCHAR(100) NOT NULL DEFAULT '',
+        message VARCHAR(500) NOT NULL,
+        likes INT UNSIGNED NOT NULL DEFAULT 0,
+        created_at VARCHAR(40) NOT NULL,
+        KEY idx_post (post_id), KEY idx_root (root_id), KEY idx_created (created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS blog_comment_likes (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        comment_id BIGINT UNSIGNED NOT NULL,
+        ip_hash VARCHAR(64) NOT NULL,
+        created_at VARCHAR(40) NOT NULL,
+        UNIQUE KEY uk_like (comment_id, ip_hash)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 }
 
 function slugify(string $text): string
@@ -275,8 +297,44 @@ if ($method === 'GET') {
         respond(200, ['categories' => $stmt->fetchAll()]);
     }
 
+    // ── 博客评论列表 ──
+    if ($action === 'comments') {
+        $postId = (int)($_GET['post_id'] ?? 0);
+        if ($postId <= 0) respond(400, ['error' => '缺少 post_id']);
+        $page = max(1, (int)($_GET['page'] ?? 1));
+        $limit = 50;
+
+        $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM blog_comments WHERE post_id = ? AND parent_id IS NULL");
+        $cntStmt->execute([$postId]);
+        $total = (int)$cntStmt->fetchColumn();
+
+        $stmt = $pdo->prepare(
+            "SELECT id, name, message, likes, created_at AS createdAt
+             FROM blog_comments WHERE post_id = ? AND parent_id IS NULL
+             ORDER BY id DESC LIMIT ? OFFSET ?"
+        );
+        $stmt->execute([$postId, $limit, ($page - 1) * $limit]);
+        $items = $stmt->fetchAll();
+
+        $vh = visitorHash();
+        $replyStmt = $pdo->prepare(
+            "SELECT id, parent_id, root_id, name, message, likes, created_at AS createdAt
+             FROM blog_comments WHERE root_id = ? AND parent_id IS NOT NULL ORDER BY id ASC LIMIT 10"
+        );
+
+        foreach ($items as &$item) {
+            $item['liked'] = (bool)$pdo->prepare("SELECT id FROM blog_comment_likes WHERE comment_id = ? AND ip_hash = ?")->execute([(int)$item['id'], $vh])->fetch();
+            $replyStmt->execute([(int)$item['id']]);
+            $item['replies'] = $replyStmt->fetchAll();
+        }
+        unset($item);
+
+        respond(200, ['items' => $items, 'total' => $total]);
+    }
+
     // ── 管理后台：文章列表（含未发布） ──
     if ($action === 'admin_posts') {
+        requireAuth();
         requireAuth();
         $page = max(1, (int)($_GET['page'] ?? 1));
         $limit = 20;
@@ -335,6 +393,59 @@ if ($action === 'like_post') {
     $check->execute([$postId]);
     respond(200, ['ok' => true, 'likes' => (int)$check->fetchColumn(), 'liked' => !$existing]);
 }
+
+// ── 评论和点赞评论（无需登录） ──
+
+// ── 发评论 ──
+if ($action === 'post_comment') {
+    $postId = (int)($input['post_id'] ?? 0);
+    $name = sanitizeStr($input['name'] ?? '', 40);
+    $message = trim(strip_tags($input['message'] ?? ''));
+    $parentId = isset($input['parent_id']) ? (int)$input['parent_id'] : null;
+
+    if ($postId <= 0 || $name === '' || $message === '') respond(400, ['error' => '参数不完整']);
+    if (strlen($message) > 500) respond(400, ['error' => '内容过长']);
+
+    $rootId = null;
+    if ($parentId > 0) {
+        $r = $pdo->prepare("SELECT COALESCE(root_id, id) AS rid FROM blog_comments WHERE id = ?");
+        $r->execute([$parentId]);
+        $rootId = (int)($r->fetchColumn() ?: $parentId);
+    }
+
+    $pdo->prepare("INSERT INTO blog_comments (post_id, parent_id, root_id, name, message, created_at) VALUES (?,?,?,?,?,?)")
+        ->execute([$postId, $parentId ?: null, $rootId, $name, $message, gmdate('c')]);
+
+    if (!$parentId) {
+        $newId = (int)$pdo->lastInsertId();
+        $pdo->prepare("UPDATE blog_comments SET root_id = ? WHERE id = ?")->execute([$newId, $newId]);
+    }
+
+    $pdo->prepare("UPDATE blog_posts SET comments = comments + 1 WHERE id = ?")->execute([$postId]);
+    respond(200, ['ok' => true]);
+}
+
+// ── 点赞/取消点赞评论 ──
+if ($action === 'like_comment') {
+    $commentId = (int)($input['comment_id'] ?? 0);
+    if ($commentId <= 0) respond(400, ['error' => '缺少 comment_id']);
+    $vh = visitorHash();
+    $exist = $pdo->prepare("SELECT id FROM blog_comment_likes WHERE comment_id = ? AND ip_hash = ?");
+    $exist->execute([$commentId, $vh]);
+    $row = $exist->fetch();
+    if ($row) {
+        $pdo->prepare("DELETE FROM blog_comment_likes WHERE id = ?")->execute([$row['id']]);
+        $pdo->prepare("UPDATE blog_comments SET likes = GREATEST(likes - 1, 0) WHERE id = ?")->execute([$commentId]);
+    } else {
+        $pdo->prepare("INSERT INTO blog_comment_likes (comment_id, ip_hash, created_at) VALUES (?,?,?)")->execute([$commentId, $vh, gmdate('c')]);
+        $pdo->prepare("UPDATE blog_comments SET likes = likes + 1 WHERE id = ?")->execute([$commentId]);
+    }
+    $c = $pdo->prepare("SELECT likes FROM blog_comments WHERE id = ?");
+    $c->execute([$commentId]);
+    respond(200, ['ok' => true, 'likes' => (int)$c->fetchColumn(), 'liked' => !$row]);
+}
+
+requireAuth();
 
 // ── 创建文章 ──
 if ($action === 'create') {

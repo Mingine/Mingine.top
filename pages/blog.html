@@ -286,11 +286,12 @@
           (tags ? '<div class="blog-card-tags" style="margin-bottom:16px;">' + tags + '</div>' : '') +
           '<div class="blog-detail-content">' + (post.content_html || '') + '</div>' +
           '<div class="blog-like-bar" style="margin-top:32px;padding:20px 0;text-align:center;border-top:1px solid var(--glass-border);">' +
-            '<button class="blog-like-btn' + (post.liked ? ' liked' : '') + '" id="like-btn" style="display:inline-flex;align-items:center;gap:8px;padding:10px 28px;border:1px solid var(--glass-border);border-radius:999px;background:transparent;color:var(--text-color);font-size:1rem;cursor:pointer;transition:all 0.25s;">' +
-              '<i class="' + (post.liked ? 'fas' : 'far') + ' fa-heart" style="font-size:1.2rem;color:' + (post.liked ? '#ef4444' : 'inherit') + ';"></i>' +
-              '<span id="like-count">' + (post.likes || 0) + '</span>' +
+            '<button class="blog-like-btn' + (post.liked ? ' liked' : '') + '" id="like-btn" style="display:inline-flex;flex-direction:column;align-items:center;gap:4px;padding:12px 32px;border:1px solid var(--glass-border);border-radius:12px;background:transparent;color:var(--text-color);font-size:0.9rem;cursor:pointer;transition:all 0.25s;">' +
+              '<i class="' + (post.liked ? 'fas' : 'far') + ' fa-heart" style="font-size:1.5rem;color:' + (post.liked ? '#ef4444' : 'inherit') + ';"></i>' +
+              '<span>点赞 <b id="like-count">' + (post.likes || 0) + '</b></span>' +
             '</button>' +
-          '</div>';
+          '</div>' +
+          '<div class="blog-comments-section" id="blog-comments" style="margin-top:32px;"></div>';
         // 侧边栏标签
         document.getElementById('post-tag-list').innerHTML = tags || '<span style="opacity:0.4;font-size:0.82rem;">暂无标签</span>';
         // 点赞按钮事件
@@ -310,6 +311,8 @@
           } catch(e) {}
         });
         buildTOC();
+        // 加载博客关联的评论区
+        loadBlogComments(post.id);
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } catch(e) { document.getElementById('detail-content').innerHTML = '<div class="blog-loading">加载失败</div>'; }
     }
@@ -357,7 +360,78 @@
       document.getElementById('sidebar-tag-card').style.display = 'none';
     }
 
-    // ── URL 参数检测：?slug=xxx 直达文章 ──
+    // ── 博客评论区 ──
+    async function loadBlogComments(postId) {
+      const container = document.getElementById('blog-comments');
+      container.innerHTML = '<h3 style="margin-bottom:16px;"><i class="fas fa-comments"></i> 评论</h3><div class="bili-loading">加载中...</div>';
+
+      try {
+        const res = await fetch(BLOG_API + '?action=comments&post_id=' + postId);
+        const data = await res.json();
+        const items = data.items || [];
+
+        if (items.length === 0) {
+          container.innerHTML += '<p style="opacity:0.5;text-align:center;padding:20px;">暂无评论，来发表第一条吧</p>';
+        } else {
+          const list = document.createElement('div');
+          items.forEach(item => {
+            const el = document.createElement('div');
+            el.style.cssText = 'padding:14px 0;border-bottom:1px solid var(--glass-border);';
+            const header = '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;"><strong style="color:var(--accent-color);font-size:0.9rem;">' + (item.name || '匿名') + '</strong><span style="font-size:0.78rem;opacity:0.5;">' + relativeTime(item.createdAt) + '</span></div>';
+            const msg = '<div style="font-size:0.92rem;line-height:1.6;white-space:pre-wrap;">' + (item.message || '') + '</div>';
+            const actions = '<div style="margin-top:6px;display:flex;gap:12px;font-size:0.82rem;opacity:0.6;"><span><i class="far fa-thumbs-up"></i> ' + (item.likes || 0) + '</span></div>';
+            const replies = Array.isArray(item.replies) && item.replies.length > 0
+              ? '<div style="margin:8px 0 0 20px;padding:8px 12px;background:var(--glass-border);border-radius:6px;border-left:3px solid var(--accent-color);">' +
+                item.replies.map(r => '<div style="padding:4px 0;font-size:0.85rem;"><strong style="color:var(--accent-color);">' + (r.name || '匿名') + '</strong>：' + (r.message || '') + '</div>').join('') +
+                '</div>' : '';
+            el.innerHTML = header + msg + actions + replies;
+            list.appendChild(el);
+          });
+          container.appendChild(list);
+        }
+
+        // 发布评论表单
+        const form = document.createElement('div');
+        form.style.cssText = 'margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;';
+        form.innerHTML =
+          '<div style="flex:1;min-width:200px;">' +
+          '<textarea id="blog-cmt-text" rows="2" placeholder="写下你的评论..." maxlength="500" style="width:100%;padding:10px;border:1px solid var(--glass-border);border-radius:8px;background:var(--glass-border);color:var(--text-color);font-size:0.9rem;resize:vertical;font-family:inherit;outline:none;"></textarea>' +
+          '</div>' +
+          '<div style="display:flex;flex-direction:column;gap:6px;min-width:140px;">' +
+          '<input id="blog-cmt-name" placeholder="你的昵称" maxlength="40" style="padding:8px;border:1px solid var(--glass-border);border-radius:6px;background:var(--glass-border);color:var(--text-color);font-size:0.85rem;outline:none;" />' +
+          '<button id="blog-cmt-send" style="padding:8px;border:none;border-radius:6px;background:var(--accent-color);color:#fff;font-weight:600;cursor:pointer;font-size:0.85rem;">发布评论</button>' +
+          '</div>';
+        container.appendChild(form);
+
+        document.getElementById('blog-cmt-send').addEventListener('click', async () => {
+          const text = document.getElementById('blog-cmt-text').value.trim();
+          const name = document.getElementById('blog-cmt-name').value.trim() || '匿名';
+          if (!text) return;
+          const btn = document.getElementById('blog-cmt-send');
+          btn.disabled = true;
+          try {
+            const r = await fetch(BLOG_API + '?action=post_comment', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name, message: text, post_id: postId })
+            });
+            if (r.ok) {
+              document.getElementById('blog-cmt-text').value = '';
+              loadBlogComments(postId);
+            }
+          } catch(e) {} finally { btn.disabled = false; }
+        });
+      } catch(e) { container.innerHTML += '<p style="opacity:0.5;">评论加载失败</p>'; }
+    }
+
+    function relativeTime(iso) {
+      const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+      if (diff < 60) return '刚刚';
+      if (diff < 3600) return Math.floor(diff / 60) + '分钟前';
+      if (diff < 86400) return Math.floor(diff / 3600) + '小时前';
+      if (diff < 604800) return Math.floor(diff / 86400) + '天前';
+      const d = new Date(iso);
+      return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+    }
     const urlParams = new URLSearchParams(window.location.search);
     const slugParam = urlParams.get('slug');
     if (slugParam) { showPost(slugParam); } else { loadPosts(); }

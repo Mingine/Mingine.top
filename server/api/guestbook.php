@@ -100,7 +100,9 @@ function initializeSchema(PDO $pdo, string $tableName, string $likesTable): void
     // 兼容旧表: 尝试添加新列 (忽略重复列错误)
     try { $pdo->exec("ALTER TABLE `$tableName` ADD COLUMN `root_id` BIGINT UNSIGNED DEFAULT NULL AFTER `parent_id`"); } catch (Throwable $e) {}
     try { $pdo->exec("ALTER TABLE `$tableName` ADD COLUMN `likes` INT UNSIGNED NOT NULL DEFAULT 0"); } catch (Throwable $e) {}
+    try { $pdo->exec("ALTER TABLE `$tableName` ADD COLUMN `source` VARCHAR(100) DEFAULT NULL"); } catch (Throwable $e) {}
     try { $pdo->exec("ALTER TABLE `$tableName` ADD KEY `idx_root` (`root_id`)"); } catch (Throwable $e) {}
+    try { $pdo->exec("ALTER TABLE `$tableName` ADD KEY `idx_source` (`source`)"); } catch (Throwable $e) {}
 
     // 点赞记录表
     $pdo->exec("CREATE TABLE IF NOT EXISTS `$likesTable` (
@@ -181,6 +183,7 @@ if ($method === 'GET') {
     $page = max(1, (int)($_GET['page'] ?? 1));
     $limit = min(50, max(5, (int)($_GET['limit'] ?? 20)));
     $sort = $_GET['sort'] ?? 'newest';
+    $source = $_GET['source'] ?? '';
 
     $orderBy = match ($sort) {
         'oldest' => 'id ASC',
@@ -188,9 +191,13 @@ if ($method === 'GET') {
         default => 'id DESC',
     };
 
+    $whereSource = $source !== '' ? "AND source = :src" : "";
+    $srcParam = $source !== '' ? [':src' => $source] : [];
+
     // 一级评论总数
-    $cntStmt = $pdo->query("SELECT COUNT(*) FROM `$tableName` WHERE parent_id IS NULL");
-    $total = $cntStmt ? (int)$cntStmt->fetchColumn() : 0;
+    $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM `$tableName` WHERE parent_id IS NULL $whereSource");
+    $cntStmt->execute($srcParam);
+    $total = (int)$cntStmt->fetchColumn();
     $totalPages = max(1, (int)ceil($total / $limit));
     $offset = ($page - 1) * $limit;
 
@@ -198,10 +205,11 @@ if ($method === 'GET') {
     $stmt = $pdo->prepare(
         "SELECT id, name, email, message, likes, created_at AS createdAt
          FROM `$tableName`
-         WHERE parent_id IS NULL
+         WHERE parent_id IS NULL $whereSource
          ORDER BY $orderBy
          LIMIT :lim OFFSET :off"
     );
+    foreach ($srcParam as $k => $v) $stmt->bindValue($k, $v);
     $stmt->bindValue(':lim', $limit, PDO::PARAM_INT);
     $stmt->bindValue(':off', $offset, PDO::PARAM_INT);
     $stmt->execute();
@@ -327,6 +335,8 @@ $name = sanitizeText($input['name'] ?? '');
 $email = sanitizeText($input['email'] ?? '');
 $message = sanitizeMessage($input['message'] ?? '');
 $parentId = isset($input['parent_id']) ? (int)$input['parent_id'] : null;
+$source = isset($input['source']) ? trim((string)$input['source']) : null;
+if ($source === '') $source = null;
 
 if ($name === '' || $message === '') {
     respond(400, ['error' => '昵称和内容不能为空']);
@@ -360,15 +370,21 @@ try {
         }
 
         $stmt = $pdo->prepare(
-            "INSERT INTO `$tableName` (parent_id, root_id, name, email, message, created_at) VALUES (:pid, :rid, :name, :email, :msg, :ca)"
+            "INSERT INTO `$tableName` (parent_id, root_id, name, email, message, source, created_at) VALUES (:pid, :rid, :name, :email, :msg, :src, :ca)"
         );
-        $stmt->execute([':pid' => $parentId, ':rid' => $rootId, ':name' => $name, ':email' => $email, ':msg' => $message, ':ca' => $createdAt]);
+        $stmt->execute([':pid' => $parentId, ':rid' => $rootId, ':name' => $name, ':email' => $email, ':msg' => $message, ':src' => $source, ':ca' => $createdAt]);
     } else {
         $pdo->prepare(
-            "INSERT INTO `$tableName` (name, email, message, created_at) VALUES (:name, :email, :msg, :ca)"
-        )->execute([':name' => $name, ':email' => $email, ':msg' => $message, ':ca' => $createdAt]);
+            "INSERT INTO `$tableName` (name, email, message, source, created_at) VALUES (:name, :email, :msg, :src, :ca)"
+        )->execute([':name' => $name, ':email' => $email, ':msg' => $message, ':src' => $source, ':ca' => $createdAt]);
         $newId = (int)$pdo->lastInsertId();
         $pdo->prepare("UPDATE `$tableName` SET root_id = ? WHERE id = ?")->execute([$newId, $newId]);
+    }
+
+    // 如果是博客文章评论，增加文章评论计数
+    if ($source && str_starts_with($source, 'blog:')) {
+        $postSlug = substr($source, 5);
+        $pdo->prepare("UPDATE blog_posts SET comments = comments + 1 WHERE slug = ?")->execute([$postSlug]);
     }
 } catch (Throwable $e) {
     respond(500, ['error' => '保存失败', 'hint' => $e->getMessage()]);
