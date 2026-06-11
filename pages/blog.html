@@ -228,7 +228,7 @@
         }).join('');
 
         el.querySelectorAll('.blog-card').forEach(card => {
-          card.addEventListener('click', () => showPost(card.dataset.slug));
+          card.addEventListener('click', () => window.open('blog.html?slug=' + card.dataset.slug, '_blank'));
         });
 
         buildPagination();
@@ -353,6 +353,10 @@
     }
 
     function showList() {
+      if (urlParams.get('slug')) {
+        window.location.href = 'blog.html';
+        return;
+      }
       document.getElementById('blog-list-view').style.display = 'block';
       document.getElementById('blog-detail').classList.remove('active');
       document.getElementById('blog-toc').classList.remove('active');
