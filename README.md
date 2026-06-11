@@ -1,8 +1,6 @@
-<p align="center">
-  <img src="assets/images/image00.jpg" width="120" height="120" style="border-radius: 50%;" alt="Mingine Logo" />
-</p>
+# Mingine.top
 
-<h1 align="center">Mingine.top</h1>
+> 个人全栈网站 — 博客 · 游戏 · 音乐 · AI · 云盘 · 仪表盘
 
 <p align="center">
   <strong>🏠 我的个人小站 — 集博客、游戏、音乐、AI 聊天、云盘于一体</strong>
