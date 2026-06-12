@@ -206,7 +206,9 @@ if ($method === 'GET') {
             'game_hub' => '游戏中心',
             'drive_upload' => '云盘上传',
             'drive_download' => '云盘下载',
-            'guestbook' => '评论区',
+            'guestbook' => '留言',
+            'comment' => '评论',
+            'blog' => '博客',
             'page_view' => '页面浏览',
         ];
         $moduleStats = [];

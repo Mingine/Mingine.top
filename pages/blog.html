@@ -177,7 +177,8 @@
         const cats = await catRes.json();
 
         const catEl = document.getElementById('category-list');
-        catEl.innerHTML = '<a class="blog-sidebar-item' + (currentCat === '' ? ' active' : '') + '" data-cat="">全部</a>';
+        const totalPosts = (cats.categories || []).reduce((sum, c) => sum + (parseInt(c.post_count, 10) || 0), 0);
+        catEl.innerHTML = '<a class="blog-sidebar-item' + (currentCat === '' ? ' active' : '') + '" data-cat="">全部<span class="blog-sidebar-count">(' + totalPosts + ')</span></a>';
         (cats.categories || []).forEach(c => {
           catEl.innerHTML += '<a class="blog-sidebar-item' + (currentCat === c.slug ? ' active' : '') + '" data-cat="' + c.slug + '">' + c.name + '<span class="blog-sidebar-count">(' + c.post_count + ')</span></a>';
         });
@@ -419,6 +420,7 @@
               body: JSON.stringify({ name, message: text, post_id: postId })
             });
             if (r.ok) {
+              if (typeof window.trackModule === 'function') window.trackModule('comment');
               document.getElementById('blog-cmt-text').value = '';
               loadBlogComments(postId);
             }
@@ -440,6 +442,7 @@
     const slugParam = urlParams.get('slug');
     if (slugParam) { showPost(slugParam); } else { loadPosts(); }
     loadSidebar();
+    if (typeof window.trackModule === 'function') window.trackModule('blog');
   </script>
 </body>
 </html>
