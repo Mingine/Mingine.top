@@ -41,7 +41,7 @@
           <a href="pages/portfolio.html" target="_blank" rel="noopener noreferrer" class="tag tag-link" id="tag-dev"><i class="fas fa-code"></i> 开发</a>
           <a href="pages/game.html" target="_blank" rel="noopener noreferrer" class="tag" style="text-decoration: none; display: inline-block; color: white; cursor: pointer;"><i class="fas fa-gamepad"></i> 游戏</a>
           <button type="button" class="tag tag-button" id="tag-music"><i class="fas fa-music"></i> 音乐</button>
-          <span class="tag"><i class="fas fa-book"></i> 漫画</span>
+          <span class="tag" style="cursor: pointer;" onclick="const t = document.createElement('div'); t.className = 'toast success'; t.textContent = '该功能待实现'; document.body.appendChild(t); setTimeout(() => { t.classList.add('fadeout'); setTimeout(() => t.remove(), 400); }, 2500);"><i class="fas fa-book"></i> 漫画</span>
           <button type="button" class="tag tag-button" id="tag-ai-chat"><i class="fas fa-robot"></i> AI Bot</button>
           <a href="pages/contact.html#guestbook" target="_blank" rel="noopener noreferrer" class="tag" style="text-decoration: none; display: inline-block; color: white; cursor: pointer;"><i class="fas fa-pen"></i> 留言板</a>
           <a href="pages/drive.html" target="_blank" rel="noopener noreferrer" class="tag tag-link"><i class="fas fa-cloud"></i> 云盘</a>

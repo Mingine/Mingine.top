@@ -213,20 +213,44 @@
           return;
         }
 
-        el.innerHTML = posts.map(p => {
+        const pinnedPosts = posts.filter(p => p.is_pinned == 1);
+        const normalPosts = posts.filter(p => p.is_pinned != 1);
+
+        let html = '';
+        const renderPost = p => {
           const cover = p.cover_image ? '<img class="blog-card-cover" src="' + p.cover_image + '" alt="">' : '<div class="blog-card-cover"></div>';
           const tags = (p.tags || []).map(t => '<span class="blog-tag">' + t.name + '</span>').join('');
           const date = new Date(p.created_at);
           const dateStr = isNaN(date.getTime()) ? '' : date.getFullYear() + '-' + String(date.getMonth()+1).padStart(2,'0') + '-' + String(date.getDate()).padStart(2,'0');
+          const pinBadge = p.is_pinned == 1 ? '<span style="display:inline-block;background:rgba(251,114,153,0.1);color:#FB7299;font-size:0.75rem;padding:2px 6px;border-radius:4px;margin-right:8px;vertical-align:middle;border:1px solid rgba(251,114,153,0.3);"><i class="fas fa-thumbtack"></i> 置顶</span>' : '';
           return '<article class="blog-card glass" data-slug="' + p.slug + '">' + cover +
             '<div class="blog-card-body">' +
             (p.category_name ? '<div class="blog-card-cat">' + p.category_name + '</div>' : '') +
-            '<h2 class="blog-card-title">' + p.title + '</h2>' +
+            '<h2 class="blog-card-title">' + pinBadge + p.title + '</h2>' +
             '<p class="blog-card-excerpt">' + (p.excerpt || '') + '</p>' +
             (tags ? '<div class="blog-card-tags">' + tags + '</div>' : '') +
             '<div class="blog-card-meta"><span><i class="far fa-calendar"></i> ' + dateStr + '</span><span><i class="far fa-eye"></i> ' + p.views + ' 阅读</span><span><i class="far fa-comment-dots"></i> ' + (p.comments || 0) + '</span><span><i class="far fa-heart"></i> ' + (p.likes || 0) + '</span></div>' +
             '</div></article>';
-        }).join('');
+        };
+
+        if (pinnedPosts.length > 0) {
+          html += '<div style="margin-bottom: 24px;">';
+          html += '<h3 style="font-size: 1.1rem; opacity: 0.8; margin-bottom: 12px; display: flex; align-items: center; gap: 8px;"><i class="fas fa-thumbtack" style="color: #FB7299;"></i> 推荐文章</h3>';
+          html += '<div style="display: flex; flex-direction: column; gap: 20px;">';
+          html += pinnedPosts.map(renderPost).join('');
+          html += '</div></div>';
+          if (normalPosts.length > 0) {
+            html += '<hr style="border:none;border-top:1px dashed var(--glass-border);margin: 10px 0 24px 0;" />';
+          }
+        }
+
+        if (normalPosts.length > 0) {
+          html += '<div style="display: flex; flex-direction: column; gap: 20px;">';
+          html += normalPosts.map(renderPost).join('');
+          html += '</div>';
+        }
+
+        el.innerHTML = html;
 
         el.querySelectorAll('.blog-card').forEach(card => {
           card.addEventListener('click', () => window.open('blog.html?slug=' + card.dataset.slug, '_blank'));

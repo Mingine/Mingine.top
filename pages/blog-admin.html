@@ -207,8 +207,40 @@
         tbody.innerHTML = posts.map(p => {
           const date = new Date(p.created_at);
           const ds = isNaN(date.getTime()) ? '' : date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0');
-          return '<tr><td><strong>' + p.title + '</strong></td><td>' + (p.category_name || '-') + '</td><td><span class="admin-status ' + (p.is_published == 1 ? 'pub' : 'draft') + '">' + (p.is_published == 1 ? '已发布' : '草稿') + '</span></td><td>' + ds + '</td><td class="admin-actions"><button class="admin-btn outline" data-edit="' + p.id + '" style="font-size:0.8rem;padding:4px 10px;">编辑</button><button class="admin-btn danger" data-del="' + p.id + '" style="font-size:0.8rem;padding:4px 10px;">删除</button></td></tr>';
+          const pinBadge = p.is_pinned == 1 ? '<span class="admin-status" style="background:rgba(251,114,153,0.2);color:#FB7299;margin-left:6px;">置顶(序:'+p.pin_order+')</span>' : '';
+          return '<tr><td><strong>' + p.title + '</strong>' + pinBadge + '</td><td>' + (p.category_name || '-') + '</td><td><span class="admin-status ' + (p.is_published == 1 ? 'pub' : 'draft') + '">' + (p.is_published == 1 ? '已发布' : '草稿') + '</span></td><td>' + ds + '</td><td class="admin-actions"><button class="admin-btn outline" data-pin="' + p.id + '" data-ispinned="' + p.is_pinned + '" data-order="' + p.pin_order + '" style="font-size:0.8rem;padding:4px 10px;">' + (p.is_pinned == 1 ? '改置顶/取消' : '设为置顶') + '</button><button class="admin-btn outline" data-edit="' + p.id + '" style="font-size:0.8rem;padding:4px 10px;">编辑</button><button class="admin-btn danger" data-del="' + p.id + '" style="font-size:0.8rem;padding:4px 10px;">删除</button></td></tr>';
         }).join('');
+        tbody.querySelectorAll('[data-pin]').forEach(b => b.addEventListener('click', async () => {
+          const id = parseInt(b.dataset.pin);
+          const currentPinned = b.dataset.ispinned == '1';
+          const currentOrder = b.dataset.order;
+          let isPinned = 1;
+          let order = 0;
+          
+          if (currentPinned) {
+            const val = prompt('修改置顶优先级(数字越小越靠前)\n\n如果需要取消置顶，请输入 "cancel" 或是 "取消"：', currentOrder);
+            if (val === null) return;
+            if (val.trim() === 'cancel' || val.trim() === '取消') {
+              isPinned = 0;
+            } else {
+              order = parseInt(val, 10) || 0;
+            }
+          } else {
+            const val = prompt('设为置顶：请输入置顶优先级(数字越小越靠前，默认0):', '0');
+            if (val === null) return;
+            order = parseInt(val, 10) || 0;
+          }
+          
+          try {
+            const res = await fetch(BLOG_API + '?action=update_pin', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id, is_pinned: isPinned, pin_order: order })
+            });
+            const data = await res.json();
+            if (res.ok && data.ok) { toast('置顶状态已更新'); loadPostList(adminPage); }
+            else toast(data.error || '操作失败', 'error');
+          } catch(e) { toast('请求失败', 'error'); }
+        }));
         tbody.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => editPost(parseInt(b.dataset.edit))));
         tbody.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => deletePost(parseInt(b.dataset.del))));
         buildAdminPagination();

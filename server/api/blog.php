@@ -94,15 +94,19 @@ function initTables(PDO $pdo): void
         likes INT UNSIGNED NOT NULL DEFAULT 0,
         comments INT UNSIGNED NOT NULL DEFAULT 0,
         is_published TINYINT(1) NOT NULL DEFAULT 0,
+        is_pinned TINYINT(1) NOT NULL DEFAULT 0,
+        pin_order INT NOT NULL DEFAULT 0,
         views INT UNSIGNED NOT NULL DEFAULT 0,
         created_at VARCHAR(40) NOT NULL, updated_at VARCHAR(40) NOT NULL,
         UNIQUE KEY uk_slug (slug),
-        KEY idx_category (category_id), KEY idx_published (is_published), KEY idx_created (created_at)
+        KEY idx_category (category_id), KEY idx_published (is_published), KEY idx_created (created_at), KEY idx_pin (is_pinned, pin_order)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
     try { $pdo->exec("ALTER TABLE blog_posts ADD COLUMN tags_json TEXT"); } catch (Throwable $e) {}
     try { $pdo->exec("ALTER TABLE blog_posts ADD COLUMN likes INT UNSIGNED NOT NULL DEFAULT 0"); } catch (Throwable $e) {}
     try { $pdo->exec("ALTER TABLE blog_posts ADD COLUMN comments INT UNSIGNED NOT NULL DEFAULT 0"); } catch (Throwable $e) {}
+    try { $pdo->exec("ALTER TABLE blog_posts ADD COLUMN is_pinned TINYINT(1) NOT NULL DEFAULT 0"); } catch (Throwable $e) {}
+    try { $pdo->exec("ALTER TABLE blog_posts ADD COLUMN pin_order INT NOT NULL DEFAULT 0"); } catch (Throwable $e) {}
 
     // 点赞记录表
     $pdo->exec("CREATE TABLE IF NOT EXISTS blog_likes (
@@ -224,12 +228,12 @@ if ($method === 'GET') {
         $total = (int)$cntStmt->fetchColumn();
         $totalPages = max(1, (int)ceil($total / $limit));
 
-        $sql = "SELECT p.id, p.title, p.slug, p.excerpt, p.cover_image, p.tags_json, p.views, p.likes, p.comments, p.created_at,
+        $sql = "SELECT p.id, p.title, p.slug, p.excerpt, p.cover_image, p.tags_json, p.views, p.likes, p.comments, p.created_at, p.is_pinned, p.pin_order,
                        c.name AS category_name, c.slug AS category_slug
                 FROM blog_posts p
                 LEFT JOIN blog_categories c ON p.category_id = c.id
                 WHERE $where
-                ORDER BY p.created_at DESC
+                ORDER BY p.is_pinned DESC, p.pin_order ASC, p.created_at DESC
                 LIMIT $limit OFFSET $offset";
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
@@ -578,6 +582,19 @@ if ($action === 'delete') {
     $id = (int)($input['id'] ?? 0);
     if ($id <= 0) respond(400, ['error' => '缺少 id']);
     $pdo->prepare("DELETE FROM blog_posts WHERE id = ?")->execute([$id]);
+    respond(200, ['ok' => true]);
+}
+
+// ── 修改置顶状态 ──
+if ($action === 'update_pin') {
+    $id = (int)($input['id'] ?? 0);
+    $isPinned = !empty($input['is_pinned']) ? 1 : 0;
+    $pinOrder = (int)($input['pin_order'] ?? 0);
+    
+    if ($id <= 0) respond(400, ['error' => '缺少 id']);
+    
+    $pdo->prepare("UPDATE blog_posts SET is_pinned = ?, pin_order = ? WHERE id = ?")
+        ->execute([$isPinned, $pinOrder, $id]);
     respond(200, ['ok' => true]);
 }
 
